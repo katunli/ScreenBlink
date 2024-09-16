@@ -45,5 +45,18 @@
 		"vite-plugin-electron-renderer": "^0.14.5",
 		"vitest": "^2.1.1"
 	},
-	"main": "dist-electron/main.js"
+	"main": "dist-electron/main.js",
+	"build": {
+		"appId": "com.electron.react.tailwind",
+		"mac": {
+			"target": ["dmg", "zip"]
+		},
+		"win": {
+			"target": ["nsis", "zip"]
+		},
+		"linux": {
+			"target": ["AppImage", "deb", "rpm", "tar.gz"],
+			"category": "Utility"
+		}
+	}
 }
