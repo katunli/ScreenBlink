@@ -1,3 +1,4 @@
+import ElectronLogo from "@/assets/electron-logo.svg";
 import ReactLogo from "@/assets/react-logo.svg";
 import ViteLogo from "@/assets/vite-logo.svg";
 import VitestLogo from "@/assets/vitest-logo.svg";
@@ -11,7 +12,7 @@ export default function App() {
 	const introductionPhrases = [
 		"Build modern apps with Electron and React!",
 		"Create high-quality desktop apps fast.",
-		"Boost your productivity with modern tools.",
+		"Boost your productivity with modern web tools.",
 	];
 
 	const [phrase, setPhrase] = useState(introductionPhrases[0]);
@@ -26,14 +27,15 @@ export default function App() {
 	};
 
 	return (
-		<div className="bg-gray-950 w-screen h-screen flex flex-col items-center justify-center gap-5">
+		<div className="bg-gray-950 w-screen h-screen flex flex-col items-center justify-center gap-5 p-5">
 			<div className="flex flex-col items-center gap-3">
 				<h1 className="text-3xl text-slate-200">{phrase}</h1>
 				<span className="text-xl text-slate-300">
 					Edit file src/app.tsx to start!
 				</span>
 			</div>
-			<div className="flex items-center gap-5 z-10">
+			<div className="flex flex-wrap items-center gap-5 z-10">
+				<img src={ElectronLogo} width={50} height={50} alt="ElectronJS Logo" />
 				<img src={ReactLogo} width={50} height={50} alt="ReactJS Logo" />
 				<img
 					src={TailwindCSSLogo}
