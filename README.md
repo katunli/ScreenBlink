@@ -1,27 +1,26 @@
 # Electron + React + Tailwind Boilerplate
-
 A modern boilerplate to build cross-platform, high-performance desktop applications using Electron, React, Tailwind CSS, and other cutting-edge web development tools.
----
+
 ## Features
 
-- Electron: Cross-platform desktop app development with web technologies.
-- React: Efficient library for building dynamic user interfaces.
-- Tailwind CSS: Utility-first CSS framework for fast UI development.
-- Shadcn UI: Reusable and customizable components to speed up development.
-- Vite: Lightning-fast development server with hot module replacement (HMR).
-- Vitest: Fast and simple unit testing for React components.
-- React Testing Library: Helps test React components in a user-centric way.
-- Happy DOM: A fast DOM simulation for testing React components.
-- Biome: A fast and reliable linter and code formatter for consistent code style.
+- **ElectronJS**: Cross-platform desktop app development with web technologies.
+- **ReactJS**: Efficient library for building dynamic user interfaces.
+- **TailwindCSS**: Utility-first CSS framework for fast UI development.
+- **ShadcnUI**: Reusable and customizable components to speed up development.
+- **Vite**: Lightning-fast development server with hot module replacement (HMR).
+- **Vitest**: Fast and simple unit testing for React components.
+- **React Testing Library**: Helps test React components in a user-centric way.
+- **Happy DOM**: A fast DOM simulation for testing React components.
+- **BiomeJS**: A fast and reliable linter and code formatter for consistent code style.
 
 ## Getting Started
 
 1. Clone or Fork the Repository
 
 You can either use this template by clicking the "Use this template" button or clone the repository to your local machine:
-
-git clone https://github.com/Molizanee/electron-react-tailwind.git
-cd electron-react-tailwind
+```bash
+git clone https://github.com/Molizanee/electron-react-tailwind.git && cd electron-react-tailwind
+```
 
 2. Install Dependencies
 
