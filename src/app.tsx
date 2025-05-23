@@ -7,48 +7,71 @@ interface PopupColors {
   opacity: number;
 }
 
+interface UserPreferences {
+  darkMode: boolean;
+  reminderInterval: number;
+  cameraEnabled: boolean;
+  eyeExercisesEnabled: boolean;
+  popupPosition: string;
+  popupColors: PopupColors;
+  isTracking: boolean;
+}
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  darkMode: true,
+  reminderInterval: 5,
+  cameraEnabled: false,
+  eyeExercisesEnabled: true,
+  popupPosition: 'top-right',
+  popupColors: {
+    background: '#1E1E1E',
+    text: '#FFFFFF',
+    opacity: 0.5
+  },
+  isTracking: false
+};
+
 export default function DryEyeHealthHomepage() {
-  const [reminderInterval, setReminderInterval] = useState(5);
-  const [isTracking, setIsTracking] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(false);
-  const [eyeExercisesEnabled, setEyeExercisesEnabled] = useState(true);
-  const [popupPosition, setPopupPosition] = useState('top-right');
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-  const [popupColors, setPopupColors] = useState<PopupColors>(() => {
-    const saved = localStorage.getItem('popupColors');
-    return saved ? JSON.parse(saved) : {
-      background: '#1E1E1E',
-      text: '#FFFFFF',
-      opacity: 0.5
-    };
+  const [preferences, setPreferences] = useState<UserPreferences>(() => {
+    return DEFAULT_PREFERENCES;
   });
 
+  // Load preferences from main process
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-    if (isDarkMode) {
+    window.ipcRenderer?.on('load-preferences', (savedPreferences) => {
+      setPreferences(prev => ({
+        ...prev,
+        ...savedPreferences
+      }));
+    });
+  }, []);
+
+  // Update main process whenever preferences change
+  useEffect(() => {
+    // Apply dark mode
+    if (preferences.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
 
-  useEffect(() => {
-    localStorage.setItem('popupColors', JSON.stringify(popupColors));
-    window.ipcRenderer?.send('update-popup-colors', popupColors);
-  }, [popupColors]);
+    // Send all preference updates to main process
+    window.ipcRenderer?.send('update-dark-mode', preferences.darkMode);
+    window.ipcRenderer?.send('update-camera-enabled', preferences.cameraEnabled);
+    window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
+    window.ipcRenderer?.send('update-popup-colors', preferences.popupColors);
+    window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
+  }, [preferences]);
 
   const handleStartStop = () => {
-    if (!isTracking) {
+    if (!preferences.isTracking) {
       // Start reminders: send interval in ms
-      window.ipcRenderer?.send('start-blink-reminders', reminderInterval * 1000);
+      window.ipcRenderer?.send('start-blink-reminders', preferences.reminderInterval * 1000);
     } else {
       // Stop reminders
       window.ipcRenderer?.send('stop-blink-reminders');
     }
-    setIsTracking(!isTracking);
+    setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
   };
 
   return (
@@ -74,11 +97,11 @@ export default function DryEyeHealthHomepage() {
                   Control Panel
                 </h2>
                 <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  onClick={() => setPreferences(prev => ({ ...prev, darkMode: !prev.darkMode }))}
                   className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   aria-label="Toggle dark mode"
                 >
-                  {isDarkMode ? (
+                  {preferences.darkMode ? (
                     <Sun className="w-5 h-5 text-yellow-500" />
                   ) : (
                     <Moon className="w-5 h-5 text-gray-600" />
@@ -97,25 +120,25 @@ export default function DryEyeHealthHomepage() {
                     type="range"
                     min="1"
                     max="60"
-                    value={reminderInterval}
+                    value={preferences.reminderInterval}
                     onChange={(e) => {
                       const newInterval = parseInt(e.target.value);
-                      setReminderInterval(newInterval);
-                      if (isTracking) {
+                      setPreferences(prev => ({ ...prev, reminderInterval: newInterval }));
+                      if (preferences.isTracking) {
                         window.ipcRenderer?.send('update-interval', newInterval * 1000);
                       }
                     }}
                     className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(reminderInterval - 1) / 59 * 100}%, ${isDarkMode ? '#1E3A8A' : '#E5E7EB'} ${(reminderInterval - 1) / 59 * 100}%, ${isDarkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
+                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(preferences.reminderInterval - 1) / 59 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} ${(preferences.reminderInterval - 1) / 59 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
                     }}
                   />
                   <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full font-semibold min-w-[80px] text-center">
-                    {reminderInterval}s
+                    {preferences.reminderInterval}s
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  Get reminded to blink every {reminderInterval} second{reminderInterval !== 1 ? 's' : ''}
+                  Get reminded to blink every {preferences.reminderInterval} second{preferences.reminderInterval !== 1 ? 's' : ''}
                 </p>
               </div>
 
@@ -124,12 +147,12 @@ export default function DryEyeHealthHomepage() {
                 <button
                   onClick={handleStartStop}
                   className={`inline-flex items-center gap-2 sm:gap-3 px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-200 transform hover:scale-105 active:scale-95 ${
-                    isTracking
+                    preferences.isTracking
                       ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-200 dark:shadow-red-900/30'
                       : 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-green-900/30'
                   }`}
                 >
-                  {isTracking ? (
+                  {preferences.isTracking ? (
                     <>
                       <Square className="w-5 h-5 sm:w-6 sm:h-6" />
                       Stop Reminders
@@ -142,7 +165,7 @@ export default function DryEyeHealthHomepage() {
                   )}
                 </button>
                 
-                {isTracking && (
+                {preferences.isTracking && (
                   <div className="mt-4 flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
                     <Activity className="w-4 h-4 animate-pulse" />
                     <span className="text-sm font-medium">Tracking active</span>
@@ -163,14 +186,14 @@ export default function DryEyeHealthHomepage() {
                     <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Camera Eye Tracking</span>
                   </div>
                   <button
-                    onClick={() => setCameraEnabled(!cameraEnabled)}
+                    onClick={() => setPreferences(prev => ({ ...prev, cameraEnabled: !prev.cameraEnabled }))}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cameraEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                      preferences.cameraEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cameraEnabled ? 'translate-x-6' : 'translate-x-1'
+                        preferences.cameraEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -178,7 +201,7 @@ export default function DryEyeHealthHomepage() {
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Use your camera to automatically detect when you blink, in order to close reminders and track your blink rate
                 </p>
-                {cameraEnabled && (
+                {preferences.cameraEnabled && (
                   <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
                     Camera access will be requested when tracking starts
                   </div>
@@ -193,14 +216,14 @@ export default function DryEyeHealthHomepage() {
                     <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Eye Exercises</span>
                   </div>
                   <button
-                    onClick={() => setEyeExercisesEnabled(!eyeExercisesEnabled)}
+                    onClick={() => setPreferences(prev => ({ ...prev, eyeExercisesEnabled: !prev.eyeExercisesEnabled }))}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      eyeExercisesEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                      preferences.eyeExercisesEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        eyeExercisesEnabled ? 'translate-x-6' : 'translate-x-1'
+                        preferences.eyeExercisesEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -208,7 +231,7 @@ export default function DryEyeHealthHomepage() {
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Get prompted for eye exercises at different intervals to help reduce eye strain
                 </p>
-                {eyeExercisesEnabled && (
+                {preferences.eyeExercisesEnabled && (
                   <div className="mt-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
                     Exercise reminders will appear periodically
                   </div>
@@ -228,11 +251,11 @@ export default function DryEyeHealthHomepage() {
                     <button
                       key={pos}
                       onClick={() => {
-                        setPopupPosition(pos);
+                        setPreferences(prev => ({ ...prev, popupPosition: pos }));
                         window.ipcRenderer?.send('update-popup-position', pos);
                       }}
                       className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                        popupPosition === pos
+                        preferences.popupPosition === pos
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                       }`}
@@ -260,14 +283,20 @@ export default function DryEyeHealthHomepage() {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={popupColors.background}
-                        onChange={(e) => setPopupColors(prev => ({ ...prev, background: e.target.value }))}
+                        value={preferences.popupColors.background}
+                        onChange={(e) => setPreferences(prev => ({
+                          ...prev,
+                          popupColors: { ...prev.popupColors, background: e.target.value }
+                        }))}
                         className="w-10 h-10 rounded cursor-pointer"
                       />
                       <input
                         type="text"
-                        value={popupColors.background}
-                        onChange={(e) => setPopupColors(prev => ({ ...prev, background: e.target.value }))}
+                        value={preferences.popupColors.background}
+                        onChange={(e) => setPreferences(prev => ({
+                          ...prev,
+                          popupColors: { ...prev.popupColors, background: e.target.value }
+                        }))}
                         className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
                         placeholder="#000000"
                       />
@@ -278,14 +307,20 @@ export default function DryEyeHealthHomepage() {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={popupColors.text}
-                        onChange={(e) => setPopupColors(prev => ({ ...prev, text: e.target.value }))}
+                        value={preferences.popupColors.text}
+                        onChange={(e) => setPreferences(prev => ({
+                          ...prev,
+                          popupColors: { ...prev.popupColors, text: e.target.value }
+                        }))}
                         className="w-10 h-10 rounded cursor-pointer"
                       />
                       <input
                         type="text"
-                        value={popupColors.text}
-                        onChange={(e) => setPopupColors(prev => ({ ...prev, text: e.target.value }))}
+                        value={preferences.popupColors.text}
+                        onChange={(e) => setPreferences(prev => ({
+                          ...prev,
+                          popupColors: { ...prev.popupColors, text: e.target.value }
+                        }))}
                         className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
                         placeholder="#FFFFFF"
                       />
@@ -299,12 +334,15 @@ export default function DryEyeHealthHomepage() {
                         min="0"
                         max="1"
                         step="0.1"
-                        value={popupColors.opacity}
-                        onChange={(e) => setPopupColors(prev => ({ ...prev, opacity: parseFloat(e.target.value) }))}
+                        value={preferences.popupColors.opacity}
+                        onChange={(e) => setPreferences(prev => ({
+                          ...prev,
+                          popupColors: { ...prev.popupColors, opacity: parseFloat(e.target.value) }
+                        }))}
                         className="flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
                       />
                       <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
-                        {Math.round(popupColors.opacity * 100)}%
+                        {Math.round(preferences.popupColors.opacity * 100)}%
                       </span>
                     </div>
                   </div>
@@ -321,21 +359,15 @@ export default function DryEyeHealthHomepage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm gap-3 sm:gap-0">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${isTracking ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                <span className="text-gray-600 dark:text-gray-300">
-                  Status: {isTracking ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              <div className="text-gray-400 dark:text-gray-500 hidden sm:block">|</div>
+              <div className={`w-3 h-3 rounded-full ${preferences.isTracking ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
               <span className="text-gray-600 dark:text-gray-300">
-                Interval: {reminderInterval}s
+                Status: {preferences.isTracking ? 'Active' : 'Inactive'}
               </span>
             </div>
-            <div className="flex items-center gap-3 sm:gap-4 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
-              <span>Camera: {cameraEnabled ? 'On' : 'Off'}</span>
-              <span>Exercises: {eyeExercisesEnabled ? 'On' : 'Off'}</span>
-            </div>
+            <div className="text-gray-400 dark:text-gray-500 hidden sm:block">|</div>
+            <span className="text-gray-600 dark:text-gray-300">
+              Interval: {preferences.reminderInterval}s
+            </span>
           </div>
         </div>
 

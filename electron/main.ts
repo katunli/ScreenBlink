@@ -2,9 +2,13 @@ import { app, BrowserWindow, ipcMain, screen } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import Store from 'electron-store';
 
 createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Initialize electron-store
+const store = new Store();
 
 // The built directory structure
 //
@@ -29,12 +33,24 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null;
 let blinkIntervalId: NodeJS.Timeout | null = null;
 let blinkReminderActive = false;
-let popupPosition = 'top-right';
-let currentInterval = 5000;
-let popupColors = {
-	background: '#1E1E1E',
-	text: '#FFFFFF',
-	opacity: 0.5
+
+// Load all preferences from store
+const preferences = {
+	darkMode: store.get('darkMode', false) as boolean,
+	reminderInterval: store.get('reminderInterval', 5000) as number,
+	cameraEnabled: store.get('cameraEnabled', false) as boolean,
+	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
+	popupPosition: store.get('popupPosition', 'top-right') as string,
+	popupColors: store.get('popupColors', {
+		background: '#1E1E1E',
+		text: '#FFFFFF',
+		opacity: 0.5
+	}) as {
+		background: string;
+		text: string;
+		opacity: number;
+	},
+	isTracking: false
 };
 
 function createWindow() {
@@ -50,6 +66,11 @@ function createWindow() {
 	// Test active push message to Renderer-process.
 	win.webContents.on("did-finish-load", () => {
 		win?.webContents.send("main-process-message", new Date().toLocaleString());
+		// Send initial preferences to renderer
+		win?.webContents.send("load-preferences", {
+			...preferences,
+			reminderInterval: preferences.reminderInterval / 1000 // Convert to seconds for the UI
+		});
 	});
 
 	if (VITE_DEV_SERVER_URL) {
@@ -71,7 +92,7 @@ function showBlinkPopup() {
 	let x = 40;
 	let y = 40;
 	
-	switch (popupPosition) {
+	switch (preferences.popupPosition) {
 		case 'top-left':
 			x = 40;
 			y = 40;
@@ -109,7 +130,7 @@ function showBlinkPopup() {
 	});
 	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
-		popup.webContents.send('update-colors', popupColors);
+		popup.webContents.send('update-colors', preferences.popupColors);
 	});
 	popup.once("ready-to-show", () => {
 		popup.showInactive();
@@ -121,14 +142,14 @@ function showBlinkPopup() {
 
 async function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
-	currentInterval = interval;
+	preferences.reminderInterval = interval;
 	while (blinkReminderActive) {
 		await new Promise((resolve) => {
 			showBlinkPopup();
 			setTimeout(resolve, 2500); // Wait for popup to fade out
 		});
 		if (!blinkReminderActive) break;
-		await new Promise((resolve) => setTimeout(resolve, currentInterval));
+		await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
 	}
 }
 
@@ -147,15 +168,33 @@ ipcMain.on("stop-blink-reminders", () => {
 });
 
 ipcMain.on("update-popup-position", (event, position: string) => {
-	popupPosition = position;
+	preferences.popupPosition = position;
+	store.set('popupPosition', position);
 });
 
 ipcMain.on("update-interval", (event, interval: number) => {
-	currentInterval = interval;
+	preferences.reminderInterval = interval;
+	store.set('reminderInterval', interval);
 });
 
 ipcMain.on("update-popup-colors", (event, colors) => {
-	popupColors = colors;
+	preferences.popupColors = colors;
+	store.set('popupColors', colors);
+});
+
+ipcMain.on("update-dark-mode", (event, darkMode: boolean) => {
+	preferences.darkMode = darkMode;
+	store.set('darkMode', darkMode);
+});
+
+ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
+	preferences.cameraEnabled = enabled;
+	store.set('cameraEnabled', enabled);
+});
+
+ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
+	preferences.eyeExercisesEnabled = enabled;
+	store.set('eyeExercisesEnabled', enabled);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

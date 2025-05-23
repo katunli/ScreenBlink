@@ -17,6 +17,7 @@
 		"@radix-ui/react-slot": "^1.1.0",
 		"class-variance-authority": "^0.7.0",
 		"clsx": "^2.1.1",
+		"electron-store": "^10.0.1",
 		"happy-dom": "^15.7.4",
 		"lucide-react": "^0.441.0",
 		"react": "^18.2.0",
@@ -49,13 +50,24 @@
 	"build": {
 		"appId": "com.electron.react.tailwind",
 		"mac": {
-			"target": ["dmg", "zip"]
+			"target": [
+				"dmg",
+				"zip"
+			]
 		},
 		"win": {
-			"target": ["nsis", "zip"]
+			"target": [
+				"nsis",
+				"zip"
+			]
 		},
 		"linux": {
-			"target": ["AppImage", "deb", "rpm", "tar.gz"],
+			"target": [
+				"AppImage",
+				"deb",
+				"rpm",
+				"tar.gz"
+			],
 			"category": "Utility"
 		}
 	}

@@ -3,7 +3,7 @@ import { ipcRenderer, contextBridge } from 'electron'
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['main-process-message'];
+    const validChannels = ['main-process-message', 'load-preferences'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }
@@ -13,7 +13,16 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     return ipcRenderer.off(channel, ...omit)
   },
   send: (channel: string, ...args: any[]) => {
-    const validChannels = ['start-blink-reminders', 'stop-blink-reminders', 'update-popup-position', 'update-interval', 'update-popup-colors'];
+    const validChannels = [
+      'start-blink-reminders',
+      'stop-blink-reminders',
+      'update-popup-position',
+      'update-interval',
+      'update-popup-colors',
+      'update-dark-mode',
+      'update-camera-enabled',
+      'update-eye-exercises-enabled'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);
     }
