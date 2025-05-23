@@ -124,6 +124,8 @@ function showBlinkPopup() {
 		skipTaskbar: true,
 		focusable: false,
 		show: false,
+		hasShadow: false,
+		acceptFirstMouse: false,
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -132,6 +134,7 @@ function showBlinkPopup() {
 	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
+		popup.setIgnoreMouseEvents(true);
 	});
 	popup.once("ready-to-show", () => {
 		popup.showInactive();
