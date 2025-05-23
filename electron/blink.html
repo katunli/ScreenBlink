@@ -14,11 +14,12 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      background: rgba(255, 255, 255, 0.3);
     }
     #blink {
       font-size: 2rem;
       font-weight: bold;
-      text-shadow: 0 2px 8px #0008;
+      text-shadow: 0 2px 8px #0004;
       opacity: 0;
       animation: fadeInOut 2.5s forwards;
     }
@@ -30,10 +31,10 @@
     }
     @media (prefers-color-scheme: dark) {
       html, body {
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.5);
       }
       #blink {
-        text-shadow: 0 2px 8px #000c;
+        text-shadow: 0 2px 8px #0008;
       }
     }
   </style>
