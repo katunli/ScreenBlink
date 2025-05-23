@@ -15,6 +15,7 @@ interface UserPreferences {
   popupPosition: string;
   popupColors: PopupColors;
   isTracking: boolean;
+  keyboardShortcut: string;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -28,13 +29,33 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     text: '#FFFFFF',
     opacity: 0.5
   },
-  isTracking: false
+  isTracking: false,
+  keyboardShortcut: 'Ctrl+Shift+B'
 };
 
 export default function DryEyeHealthHomepage() {
+  useEffect(() => {
+    // Add the animation style
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-20px); }
+      }
+      .animate-fade-out {
+        animation: fadeOut 1s ease-out forwards;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
+
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
     return DEFAULT_PREFERENCES;
   });
+  const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
+  const [tempShortcut, setTempShortcut] = useState('');
+  const [shortcutError, setShortcutError] = useState('');
 
   // Load preferences from main process
   useEffect(() => {
@@ -63,15 +84,82 @@ export default function DryEyeHealthHomepage() {
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
   }, [preferences]);
 
+  // Add keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isRecordingShortcut) {
+        e.preventDefault();
+        const keys = [];
+        if (e.ctrlKey) keys.push('Ctrl');
+        if (e.shiftKey) keys.push('Shift');
+        if (e.altKey) keys.push('Alt');
+        if (e.metaKey) keys.push('Meta');
+        
+        // Only add the key if it's not a modifier
+        if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+          keys.push(e.key.toUpperCase());
+        }
+        
+        if (keys.length > 0) {
+          setTempShortcut(keys.join('+'));
+        }
+      } else if (preferences.keyboardShortcut) {
+        const shortcutKeys = preferences.keyboardShortcut.split('+');
+        const pressedKeys = [];
+        
+        if (e.ctrlKey) pressedKeys.push('Ctrl');
+        if (e.shiftKey) pressedKeys.push('Shift');
+        if (e.altKey) pressedKeys.push('Alt');
+        if (e.metaKey) pressedKeys.push('Meta');
+        if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+          pressedKeys.push(e.key.toUpperCase());
+        }
+        
+        if (pressedKeys.join('+') === preferences.keyboardShortcut) {
+          e.preventDefault(); // Prevent default browser behavior
+          
+          // First update the state
+          setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
+          
+          // Then send the appropriate IPC message
+          if (preferences.isTracking) {
+            window.ipcRenderer?.send('stop-blink-reminders');
+          } else {
+            window.ipcRenderer?.send('start-blink-reminders', preferences.reminderInterval * 1000);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRecordingShortcut, preferences.keyboardShortcut, preferences.isTracking, preferences.reminderInterval]);
+
+  const validateShortcut = (shortcut: string): boolean => {
+    if (!shortcut) return false;
+    const parts = shortcut.split('+');
+    if (parts.length < 2) return false;
+    return true;
+  };
+
+  const handleSaveShortcut = () => {
+    if (validateShortcut(tempShortcut)) {
+      setPreferences(prev => ({ ...prev, keyboardShortcut: tempShortcut }));
+      setIsRecordingShortcut(false);
+      setShortcutError('');
+      window.ipcRenderer?.send('update-keyboard-shortcut', tempShortcut);
+    } else {
+      setShortcutError('Please use at least one modifier key (Ctrl, Shift, Alt) and one regular key');
+    }
+  };
+
   const handleStartStop = () => {
+    setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
     if (!preferences.isTracking) {
-      // Start reminders: send interval in ms
       window.ipcRenderer?.send('start-blink-reminders', preferences.reminderInterval * 1000);
     } else {
-      // Stop reminders
       window.ipcRenderer?.send('stop-blink-reminders');
     }
-    setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
   };
 
   return (
@@ -350,6 +438,66 @@ export default function DryEyeHealthHomepage() {
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
                   Customize the appearance of the blink reminder popup
                 </p>
+              </div>
+
+              {/* Keyboard Shortcut Settings */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Keyboard Shortcut</span>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm">
+                      {isRecordingShortcut ? (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          {tempShortcut || 'Press keys...'}
+                        </span>
+                      ) : (
+                        preferences.keyboardShortcut
+                      )}
+                    </div>
+                    {!isRecordingShortcut ? (
+                      <button
+                        onClick={() => {
+                          setIsRecordingShortcut(true);
+                          setTempShortcut(preferences.keyboardShortcut);
+                          setShortcutError('');
+                        }}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Change
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setIsRecordingShortcut(false);
+                            setTempShortcut('');
+                            setShortcutError('');
+                          }}
+                          className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveShortcut}
+                          className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {shortcutError && (
+                    <p className="text-red-500 text-sm">{shortcutError}</p>
+                  )}
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    Press the shortcut to start/stop reminders. Use at least one modifier key (Ctrl, Shift, Alt) and one regular key.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
