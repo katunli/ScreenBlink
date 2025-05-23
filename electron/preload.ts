@@ -21,7 +21,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-popup-colors',
       'update-dark-mode',
       'update-camera-enabled',
-      'update-eye-exercises-enabled'
+      'update-eye-exercises-enabled',
+      'update-keyboard-shortcut'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

@@ -50,7 +50,8 @@ const preferences = {
 		text: string;
 		opacity: number;
 	},
-	isTracking: false
+	isTracking: false,
+	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+Shift+B') as string
 };
 
 function createWindow() {
@@ -195,6 +196,11 @@ ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
 ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
 	preferences.eyeExercisesEnabled = enabled;
 	store.set('eyeExercisesEnabled', enabled);
+});
+
+ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
+	preferences.keyboardShortcut = shortcut;
+	store.set('keyboardShortcut', shortcut);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

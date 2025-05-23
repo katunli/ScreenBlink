@@ -82,6 +82,7 @@ export default function DryEyeHealthHomepage() {
     window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
     window.ipcRenderer?.send('update-popup-colors', preferences.popupColors);
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
+    window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
   }, [preferences]);
 
   // Add keyboard shortcut handler
@@ -500,22 +501,6 @@ export default function DryEyeHealthHomepage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Status Bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm gap-3 sm:gap-0">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className={`w-3 h-3 rounded-full ${preferences.isTracking ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-              <span className="text-gray-600 dark:text-gray-300">
-                Status: {preferences.isTracking ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-            <div className="text-gray-400 dark:text-gray-500 hidden sm:block">|</div>
-            <span className="text-gray-600 dark:text-gray-300">
-              Interval: {preferences.reminderInterval}s
-            </span>
           </div>
         </div>
 
