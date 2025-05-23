@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>0/21</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>0/21</span>
             </div>
         
             
@@ -95,7 +95,20 @@
 <a name='L30'></a><a href='#L30'>30</a>
 <a name='L31'></a><a href='#L31'>31</a>
 <a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -104,6 +117,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -113,9 +128,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -124,40 +136,67 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { app as n, BrowserWindow as t } from "electron";
-import { createRequire as a } from "node:module";
-import { fileURLToPath as c } from "node:url";
-import o from "node:path";
-<span class="cstat-no" title="statement not covered" >a(import.meta.url);</span>
-const r = <span class="cstat-no" title="statement not covered" >o.dirname(c(import.meta.url));</span>
-<span class="cstat-no" title="statement not covered" >process.env.APP_ROOT = o.join(r, "..");</span>
-const i = <span class="cstat-no" title="statement not covered" >process.env.VITE_DEV_SERVER_URL,</span> _ = <span class="cstat-no" title="statement not covered" >o.join(process.env.APP_ROOT, "dist-electron"),</span> s = <span class="cstat-no" title="statement not covered" >o.join(process.env.APP_ROOT, "dist");</span>
-<span class="cstat-no" title="statement not covered" >process.env.VITE_PUBLIC = i ? o.join(process.env.APP_ROOT, "public") : s;</span>
-let e;
-function <span class="fstat-no" title="function not covered" >l(</span>) {
-<span class="cstat-no" title="statement not covered" >  e = new t({</span>
-    icon: o.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { app, BrowserWindow } from "electron";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+<span class="cstat-no" title="statement not covered" >createRequire(import.meta.url);</span>
+const __dirname = <span class="cstat-no" title="statement not covered" >path.dirname(fileURLToPath(import.meta.url));</span>
+<span class="cstat-no" title="statement not covered" >process.env.APP_ROOT = path.join(__dirname, "..");</span>
+const VITE_DEV_SERVER_URL = <span class="cstat-no" title="statement not covered" >process.env["VITE_DEV_SERVER_URL"];</span>
+const MAIN_DIST = <span class="cstat-no" title="statement not covered" >path.join(process.env.APP_ROOT, "dist-electron");</span>
+const RENDERER_DIST = <span class="cstat-no" title="statement not covered" >path.join(process.env.APP_ROOT, "dist");</span>
+<span class="cstat-no" title="statement not covered" >process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;</span>
+let win;
+function <span class="fstat-no" title="function not covered" >createWindow(</span>) {
+<span class="cstat-no" title="statement not covered" >  win = new BrowserWindow({</span>
+    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: o.join(r, "preload.mjs")
+      preload: path.join(__dirname, "preload.mjs")
     }
-  }), e.webContents.on("did-finish-load", <span class="fstat-no" title="function not covered" >()</span> =&gt; {
-<span class="cstat-no" title="statement not covered" >    e == null || e.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());</span>
-  }), i ? e.loadURL(i) : e.loadFile(o.join(s, "index.html"));
+  });
+<span class="cstat-no" title="statement not covered" >  win.webContents.on("did-finish-load", <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());</span>
+  });
+<span class="cstat-no" title="statement not covered" >  if (VITE_DEV_SERVER_URL) {</span>
+<span class="cstat-no" title="statement not covered" >    win.loadURL(VITE_DEV_SERVER_URL);</span>
+  } else {
+<span class="cstat-no" title="statement not covered" >    win.loadFile(path.join(RENDERER_DIST, "index.html"));</span>
+  }
 }
-<span class="cstat-no" title="statement not covered" >n.on("window-all-closed", <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  process.platform !== "darwin" &amp;&amp; (n.quit(), e = null);</span>
+<span class="cstat-no" title="statement not covered" >app.on("window-all-closed", <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  if (process.platform !== "darwin") {</span>
+<span class="cstat-no" title="statement not covered" >    app.quit();</span>
+<span class="cstat-no" title="statement not covered" >    win = null;</span>
+  }
 });
-<span class="cstat-no" title="statement not covered" >n.on("activate", <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  t.getAllWindows().length === 0 &amp;&amp; l();</span>
+<span class="cstat-no" title="statement not covered" >app.on("activate", <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  if (BrowserWindow.getAllWindows().length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >    createWindow();</span>
+  }
 });
-<span class="cstat-no" title="statement not covered" >n.whenReady().then(l);</span>
+<span class="cstat-no" title="statement not covered" >app.whenReady().then(createWindow);</span>
 export {
-  _ as MAIN_DIST,
-  s as RENDERER_DIST,
-  i as VITE_DEV_SERVER_URL
+  MAIN_DIST,
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };
 &nbsp;</pre></td></tr></table></pre>
 
@@ -166,7 +205,7 @@ export {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2024-09-16T18:55:07.163Z
+                at 2025-05-22T23:18:54.269Z
             </div>
         <script src="../prettify.js"></script>
         <script>
