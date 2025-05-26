@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen, globalShortcut } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -144,6 +144,68 @@ function showBlinkPopup() {
 	}, 2500);
 }
 
+function showStoppedPopup() {
+	const display = screen.getPrimaryDisplay();
+	const { width } = display.workAreaSize;
+	const { height } = display.workAreaSize;
+	const popupWidth = 220;
+	const popupHeight = 80;
+	
+	// Calculate position based on settings
+	let x = 40;
+	let y = 40;
+	
+	switch (preferences.popupPosition) {
+		case 'top-left':
+			x = 40;
+			y = 40;
+			break;
+		case 'top-right':
+			x = width - popupWidth - 40;
+			y = 40;
+			break;
+		case 'bottom-left':
+			x = 40;
+			y = height - popupHeight - 40;
+			break;
+		case 'bottom-right':
+			x = width - popupWidth - 40;
+			y = height - popupHeight - 40;
+			break;
+	}
+
+	const popup = new BrowserWindow({
+		width: popupWidth,
+		height: popupHeight,
+		x,
+		y,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		resizable: false,
+		skipTaskbar: true,
+		focusable: false,
+		show: false,
+		hasShadow: false,
+		acceptFirstMouse: false,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
+	});
+	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "stopped.html"));
+	popup.webContents.on('did-finish-load', () => {
+		popup.webContents.send('update-colors', preferences.popupColors);
+		popup.setIgnoreMouseEvents(true);
+	});
+	popup.once("ready-to-show", () => {
+		popup.showInactive();
+	});
+	setTimeout(() => {
+		popup.close();
+	}, 2500);
+}
+
 async function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
 	preferences.reminderInterval = interval;
@@ -155,6 +217,31 @@ async function startBlinkReminderLoop(interval: number) {
 		if (!blinkReminderActive) break;
 		await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
 	}
+}
+
+function registerGlobalShortcut(shortcut: string) {
+	// Unregister any existing shortcut first
+	globalShortcut.unregisterAll();
+	
+	// Register the new shortcut
+	globalShortcut.register(shortcut, () => {
+		preferences.isTracking = !preferences.isTracking;
+		if (preferences.isTracking) {
+			startBlinkReminderLoop(preferences.reminderInterval);
+		} else {
+			blinkReminderActive = false;
+			if (blinkIntervalId) {
+				clearInterval(blinkIntervalId);
+				blinkIntervalId = null;
+			}
+			showStoppedPopup();
+		}
+		// Notify the renderer process about the state change
+		win?.webContents.send('load-preferences', {
+			...preferences,
+			reminderInterval: preferences.reminderInterval / 1000
+		});
+	});
 }
 
 ipcMain.on("start-blink-reminders", (event, interval: number) => {
@@ -169,6 +256,7 @@ ipcMain.on("stop-blink-reminders", () => {
 		clearInterval(blinkIntervalId);
 		blinkIntervalId = null;
 	}
+	showStoppedPopup();
 });
 
 ipcMain.on("update-popup-position", (event, position: string) => {
@@ -204,6 +292,7 @@ ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
 ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
 	preferences.keyboardShortcut = shortcut;
 	store.set('keyboardShortcut', shortcut);
+	registerGlobalShortcut(shortcut);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -224,4 +313,8 @@ app.on("activate", () => {
 	}
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+	createWindow();
+	// Register the initial shortcut
+	registerGlobalShortcut(preferences.keyboardShortcut);
+});
