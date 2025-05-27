@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FaceMesh } from '@mediapipe/face_mesh';
 import { Camera } from '@mediapipe/camera_utils';
 
@@ -10,6 +10,23 @@ interface CameraBlinkDetectorProps {
 
 const EAR_THRESHOLD = 0.25; // Eye Aspect Ratio threshold for blink detection
 const BLINK_COOLDOWN = 500; // Minimum time between blink detections in ms
+const PROCESSING_INTERVAL = 100; // Process frames every 100ms (10 FPS)
+const CAMERA_WIDTH = 320; // Reduced resolution
+const CAMERA_HEIGHT = 240; // Reduced resolution
+
+// Create a single instance of FaceMesh that will be reused
+const faceMesh = new FaceMesh({
+  locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+  },
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5,
+});
 
 export const CameraBlinkDetector: React.FC<CameraBlinkDetectorProps> = ({
   isEnabled,
@@ -17,107 +34,130 @@ export const CameraBlinkDetector: React.FC<CameraBlinkDetectorProps> = ({
   onError,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const faceMeshRef = useRef<FaceMesh | null>(null);
-  const cameraRef = useRef<Camera | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const lastBlinkTimeRef = useRef<number>(0);
+  const lastProcessTimeRef = useRef<number>(0);
+  const cleanupInProgressRef = useRef(false);
+  const cameraRef = useRef<Camera | null>(null);
+  const frameRequestRef = useRef<number | null>(null);
 
-  // Initialize MediaPipe Face Mesh
-  useEffect(() => {
-    const initializeFaceMesh = async () => {
-      try {
-        const faceMesh = new FaceMesh({
-          locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-          },
-        });
-
-        faceMesh.setOptions({
-          maxNumFaces: 1,
-          refineLandmarks: true,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        });
-
-        faceMesh.onResults((results) => {
-          if (results.multiFaceLandmarks && isEnabled) {
-            for (const landmarks of results.multiFaceLandmarks) {
-              // Calculate Eye Aspect Ratio (EAR)
-              const ear = calculateEAR(landmarks);
-              
-              // Detect blink
-              const now = Date.now();
-              if (ear < EAR_THRESHOLD && now - lastBlinkTimeRef.current > BLINK_COOLDOWN) {
-                lastBlinkTimeRef.current = now;
-                onBlinkDetected();
-              }
-            }
-          }
-        });
-
-        faceMeshRef.current = faceMesh;
-      } catch (error) {
-        onError('Failed to initialize face detection');
-        console.error('Face mesh initialization error:', error);
-      }
-    };
-
-    initializeFaceMesh();
-
-    return () => {
-      if (faceMeshRef.current) {
-        faceMeshRef.current.close();
-      }
-    };
-  }, [onBlinkDetected, onError]);
-
-  // Handle camera initialization and cleanup based on isEnabled
-  useEffect(() => {
-    // If eye tracking is disabled, ensure camera is stopped and cleaned up
-    if (!isEnabled) {
-      if (cameraRef.current) {
-        cameraRef.current.stop();
-        cameraRef.current = null;
-      }
+  // Cleanup function to properly dispose of resources
+  const cleanup = async () => {
+    // Prevent concurrent cleanup attempts
+    if (cleanupInProgressRef.current) {
       return;
     }
 
-    // Only proceed with camera initialization if eye tracking is enabled
-    const initializeCamera = async () => {
-      if (!isEnabled || !videoRef.current || !faceMeshRef.current) {
+    cleanupInProgressRef.current = true;
+
+    try {
+      // Cancel any pending frame requests
+      if (frameRequestRef.current) {
+        cancelAnimationFrame(frameRequestRef.current);
+        frameRequestRef.current = null;
+      }
+
+      // Stop the camera first
+      if (cameraRef.current) {
+        try {
+          cameraRef.current.stop();
+        } catch (error) {
+          console.error('Camera cleanup error:', error);
+        }
+        cameraRef.current = null;
+      }
+
+      setIsInitialized(false);
+    } catch (error) {
+      console.error('Cleanup error:', error);
+    } finally {
+      cleanupInProgressRef.current = false;
+    }
+  };
+
+  // Initialize Camera and setup FaceMesh
+  const initialize = async () => {
+    try {
+      // Clean up any existing instances first
+      await cleanup();
+
+      if (!videoRef.current) {
+        throw new Error('Video element not found');
+      }
+
+      // Set up FaceMesh results handler
+      faceMesh.onResults((results) => {
+        if (results.multiFaceLandmarks && isEnabled) {
+          for (const landmarks of results.multiFaceLandmarks) {
+            const ear = calculateEAR(landmarks);
+            const now = Date.now();
+            if (ear < EAR_THRESHOLD && now - lastBlinkTimeRef.current > BLINK_COOLDOWN) {
+              lastBlinkTimeRef.current = now;
+              onBlinkDetected();
+            }
+          }
+        }
+      });
+
+      // Create new Camera instance with optimized settings
+      const camera = new Camera(videoRef.current, {
+        onFrame: async () => {
+          const now = Date.now();
+          // Only process frames at the specified interval
+          if (now - lastProcessTimeRef.current >= PROCESSING_INTERVAL) {
+            lastProcessTimeRef.current = now;
+            
+            if (videoRef.current && isEnabled) {
+              try {
+                await faceMesh.send({ image: videoRef.current });
+              } catch (error) {
+                console.error('Frame processing error:', error);
+              }
+            }
+          }
+        },
+        width: CAMERA_WIDTH,
+        height: CAMERA_HEIGHT,
+      });
+
+      // Store the camera reference
+      cameraRef.current = camera;
+
+      // Start the camera
+      await camera.start();
+      setIsInitialized(true);
+    } catch (error) {
+      console.error('Initialization error:', error);
+      onError('Failed to initialize camera and face detection');
+      await cleanup();
+    }
+  };
+
+  // Effect to handle initialization and cleanup based on isEnabled
+  useEffect(() => {
+    let isActive = true;
+
+    const setup = async () => {
+      if (!isEnabled) {
+        await cleanup();
         return;
       }
 
-      try {
-        const camera = new Camera(videoRef.current, {
-          onFrame: async () => {
-            if (videoRef.current && isEnabled) {
-              await faceMeshRef.current?.send({ image: videoRef.current });
-            }
-          },
-          width: 640,
-          height: 480,
-        });
-        cameraRef.current = camera;
-        await camera.start();
-      } catch (error) {
-        onError('Failed to initialize camera');
-        console.error('Camera initialization error:', error);
+      if (!isInitialized) {
+        await initialize();
       }
     };
 
-    initializeCamera();
+    setup();
 
     return () => {
-      if (cameraRef.current) {
-        cameraRef.current.stop();
-        cameraRef.current = null;
-      }
+      isActive = false;
+      cleanup();
     };
-  }, [isEnabled, onError]);
+  }, [isEnabled]);
 
   // Calculate Eye Aspect Ratio (EAR)
   const calculateEAR = (landmarks: any) => {
-    // Indices for the eye landmarks
     const leftEye = [33, 160, 158, 133, 153, 144];
     const rightEye = [362, 385, 387, 263, 373, 380];
 
@@ -129,19 +169,16 @@ export const CameraBlinkDetector: React.FC<CameraBlinkDetectorProps> = ({
       const p5 = landmarks[eyeIndices[4]];
       const p6 = landmarks[eyeIndices[5]];
 
-      // Calculate distances
       const d1 = Math.sqrt(Math.pow(p2.x - p6.x, 2) + Math.pow(p2.y - p6.y, 2));
       const d2 = Math.sqrt(Math.pow(p3.x - p5.x, 2) + Math.pow(p3.y - p5.y, 2));
       const d3 = Math.sqrt(Math.pow(p1.x - p4.x, 2) + Math.pow(p1.y - p4.y, 2));
 
-      // Calculate EAR
       return (d1 + d2) / (2.0 * d3);
     };
 
     const leftEAR = getEAR(leftEye);
     const rightEAR = getEAR(rightEye);
 
-    // Return average EAR
     return (leftEAR + rightEAR) / 2.0;
   };
 
