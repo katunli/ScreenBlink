@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, Palette } from 'lucide-react';
+import { CameraBlinkDetector } from './components/CameraBlinkDetector';
 
 interface PopupColors {
   background: string;
@@ -261,42 +262,79 @@ export default function DryEyeHealthHomepage() {
                   </div>
                 )}
               </div>
+
+              {/* Camera Toggle */}
+              <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <Camera className="w-4 h-4" />
+                  Camera Detection
+                </label>
+                <button
+                  onClick={() => {
+                    const newCameraEnabled = !preferences.cameraEnabled;
+                    
+                    // If reminders are active, stop them first
+                    if (preferences.isTracking) {
+                      setPreferences(prev => ({ ...prev, isTracking: false }));
+                      window.ipcRenderer?.send('stop-blink-reminders');
+                    }
+                    
+                    // Update camera preference
+                    setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
+                    
+                    // Send appropriate camera tracking message
+                    if (newCameraEnabled) {
+                      window.ipcRenderer?.send('start-camera-tracking');
+                    } else {
+                      window.ipcRenderer?.send('stop-camera-tracking');
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    preferences.cameraEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      preferences.cameraEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Camera Description */}
+              {preferences.cameraEnabled && (
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-200">
+                  <p className="mb-2">Camera eye tracking is enabled. The camera will only activate when you start reminders. Changing this setting will pause the reminders.</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>The camera will detect when you blink and close reminders</li>
+                    <li>Reminders will only show if you haven't blinked within your set interval</li>
+                    <li>No video is recorded or stored</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Hidden Camera Component */}
+              {preferences.cameraEnabled && (
+                <div className="hidden">
+                  <CameraBlinkDetector
+                    isEnabled={preferences.isTracking}
+                    onBlinkDetected={() => {
+                      window.ipcRenderer?.send('blink-detected');
+                    }}
+                    onError={(error) => {
+                      console.error('Camera error:', error);
+                      setPreferences(prev => ({ ...prev, cameraEnabled: false }));
+                      window.ipcRenderer?.send('update-camera-enabled', false);
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Right Column - Feature Toggles */}
             <div className="space-y-6">
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Features</h2>
               
-              {/* Camera Eye Tracking Toggle */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Camera className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Camera Eye Tracking</span>
-                  </div>
-                  <button
-                    onClick={() => setPreferences(prev => ({ ...prev, cameraEnabled: !prev.cameraEnabled }))}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      preferences.cameraEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        preferences.cameraEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  Use your camera to automatically detect when you blink, in order to close reminders and track your blink rate
-                </p>
-                {preferences.cameraEnabled && (
-                  <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-                    Camera access will be requested when tracking starts
-                  </div>
-                )}
-              </div>
-
               {/* Eye Exercises Toggle */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-3">

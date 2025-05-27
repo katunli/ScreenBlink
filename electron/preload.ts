@@ -3,7 +3,11 @@ import { ipcRenderer, contextBridge } from 'electron'
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['main-process-message', 'load-preferences'];
+    const validChannels = [
+      'main-process-message', 
+      'load-preferences',
+      'camera-error'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }
@@ -22,7 +26,10 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-dark-mode',
       'update-camera-enabled',
       'update-eye-exercises-enabled',
-      'update-keyboard-shortcut'
+      'update-keyboard-shortcut',
+      'blink-detected',
+      'start-camera-tracking',
+      'stop-camera-tracking'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

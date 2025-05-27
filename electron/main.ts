@@ -33,6 +33,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null;
 let blinkIntervalId: NodeJS.Timeout | null = null;
 let blinkReminderActive = false;
+let currentPopup: BrowserWindow | null = null;
+
+// Camera-based blink detection state
+let lastBlinkTime = Date.now();
+let cameraMonitoringInterval: NodeJS.Timeout | null = null;
+let isCameraMonitoring = false;
 
 // Load all preferences from store
 const preferences = {
@@ -61,6 +67,9 @@ function createWindow() {
 		icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
 		webPreferences: {
 			preload: path.join(__dirname, "preload.mjs"),
+			nodeIntegration: false,
+			contextIsolation: true,
+			webSecurity: true
 		},
 	});
 
@@ -83,6 +92,12 @@ function createWindow() {
 }
 
 function showBlinkPopup() {
+	// Close any existing popup
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+
 	const display = screen.getPrimaryDisplay();
 	const { width } = display.workAreaSize;
 	const { height } = display.workAreaSize;
@@ -131,6 +146,8 @@ function showBlinkPopup() {
 			contextIsolation: false,
 		},
 	});
+
+	currentPopup = popup;
 	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
@@ -139,12 +156,25 @@ function showBlinkPopup() {
 	popup.once("ready-to-show", () => {
 		popup.showInactive();
 	});
-	setTimeout(() => {
-		popup.close();
-	}, 2500);
+
+	// Only auto-close if camera is not enabled
+	if (!preferences.cameraEnabled) {
+		setTimeout(() => {
+			if (currentPopup === popup) {
+				popup.close();
+				currentPopup = null;
+			}
+		}, 2500);
+	}
 }
 
 function showStoppedPopup() {
+	// Close any existing popup first
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+
 	const display = screen.getPrimaryDisplay();
 	const { width } = display.workAreaSize;
 	const { height } = display.workAreaSize;
@@ -193,6 +223,8 @@ function showStoppedPopup() {
 			contextIsolation: false,
 		},
 	});
+
+	currentPopup = popup;
 	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "stopped.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
@@ -201,8 +233,13 @@ function showStoppedPopup() {
 	popup.once("ready-to-show", () => {
 		popup.showInactive();
 	});
+	
+	// Auto-close the stopped popup after 2.5 seconds
 	setTimeout(() => {
-		popup.close();
+		if (currentPopup === popup) {
+			popup.close();
+			currentPopup = null;
+		}
 	}, 2500);
 }
 
@@ -227,13 +264,51 @@ function registerGlobalShortcut(shortcut: string) {
 	globalShortcut.register(shortcut, () => {
 		preferences.isTracking = !preferences.isTracking;
 		if (preferences.isTracking) {
-			startBlinkReminderLoop(preferences.reminderInterval);
+			// Use the same start-blink-reminders logic as the button
+			blinkReminderActive = false;
+			if (blinkIntervalId) clearInterval(blinkIntervalId);
+			if (cameraMonitoringInterval) clearInterval(cameraMonitoringInterval);
+			
+			// Close any existing popup when starting/restarting
+			if (currentPopup) {
+				currentPopup.close();
+				currentPopup = null;
+			}
+			
+			preferences.isTracking = true;
+			
+			if (preferences.cameraEnabled) {
+				// Reset last blink time and start camera monitoring
+				lastBlinkTime = Date.now();
+				startCameraMonitoring();
+			} else {
+				startBlinkReminderLoop(preferences.reminderInterval);
+			}
 		} else {
+			// Use the same stop-blink-reminders logic as the button
 			blinkReminderActive = false;
 			if (blinkIntervalId) {
 				clearInterval(blinkIntervalId);
 				blinkIntervalId = null;
 			}
+			if (cameraMonitoringInterval) {
+				clearInterval(cameraMonitoringInterval);
+				cameraMonitoringInterval = null;
+			}
+			
+			// Close any existing popup immediately
+			if (currentPopup) {
+				currentPopup.close();
+				currentPopup = null;
+			}
+			
+			// If camera was enabled, stop it
+			if (preferences.cameraEnabled) {
+				preferences.isTracking = false;
+				// Notify renderer to stop camera
+				win?.webContents.send('stop-camera');
+			}
+			
 			showStoppedPopup();
 		}
 		// Notify the renderer process about the state change
@@ -244,10 +319,58 @@ function registerGlobalShortcut(shortcut: string) {
 	});
 }
 
+function startCameraMonitoring() {
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+	}
+	
+	// Reset the last blink time when starting monitoring
+	lastBlinkTime = Date.now();
+	
+	cameraMonitoringInterval = setInterval(() => {
+		const timeSinceLastBlink = Date.now() - lastBlinkTime;
+		// Only show popup if:
+		// 1. No blink has been detected within the interval
+		// 2. There isn't already a popup showing
+		// 3. The time since last blink is exactly at or past the interval
+		if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
+			showBlinkPopup();
+		}
+	}, 100); // Check more frequently for more precise timing
+}
+
+// Camera-based blink detection IPC handlers
+ipcMain.on("blink-detected", () => {
+	// Update last blink time
+	lastBlinkTime = Date.now();
+	
+	// Close any existing popup when a blink is detected
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+});
+
 ipcMain.on("start-blink-reminders", (event, interval: number) => {
 	blinkReminderActive = false;
 	if (blinkIntervalId) clearInterval(blinkIntervalId);
-	startBlinkReminderLoop(interval);
+	if (cameraMonitoringInterval) clearInterval(cameraMonitoringInterval);
+	
+	// Close any existing popup when starting/restarting
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+	
+	preferences.isTracking = true;
+	
+	if (preferences.cameraEnabled) {
+		// Reset last blink time and start camera monitoring
+		lastBlinkTime = Date.now();
+		startCameraMonitoring();
+	} else {
+		startBlinkReminderLoop(interval);
+	}
 });
 
 ipcMain.on("stop-blink-reminders", () => {
@@ -256,6 +379,25 @@ ipcMain.on("stop-blink-reminders", () => {
 		clearInterval(blinkIntervalId);
 		blinkIntervalId = null;
 	}
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	
+	// Close any existing popup immediately
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+	
+	// If camera was enabled, stop it
+	if (preferences.cameraEnabled) {
+		preferences.isTracking = false;
+		// Notify renderer to stop camera
+		win?.webContents.send('stop-camera');
+	}
+	
+	// Only show stopped popup if we successfully closed any existing popup
 	showStoppedPopup();
 });
 
@@ -294,6 +436,33 @@ ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
 	store.set('keyboardShortcut', shortcut);
 	registerGlobalShortcut(shortcut);
 });
+
+ipcMain.on("start-camera-tracking", () => {
+	// Only update the preference flag
+	preferences.cameraEnabled = true;
+	store.set('cameraEnabled', true);
+});
+
+ipcMain.on("stop-camera-tracking", () => {
+	// Only update the preference flag
+	preferences.cameraEnabled = false;
+	store.set('cameraEnabled', false);
+	
+	// If reminders are active, stop the camera
+	if (preferences.isTracking) {
+		stopCameraMonitoring();
+		// Notify renderer to stop camera
+		win?.webContents.send('stop-camera');
+	}
+});
+
+function stopCameraMonitoring() {
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	// Remove the showStoppedPopup call from here
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
