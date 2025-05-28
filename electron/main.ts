@@ -157,6 +157,7 @@ function showBlinkPopup() {
 	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
+		popup.webContents.send('camera-mode', preferences.cameraEnabled);
 		popup.setIgnoreMouseEvents(true);
 	});
 	popup.once("ready-to-show", () => {
@@ -487,6 +488,11 @@ ipcMain.on("update-dark-mode", (event, darkMode: boolean) => {
 ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
 	preferences.cameraEnabled = enabled;
 	store.set('cameraEnabled', enabled);
+	
+	// Update camera mode status in popup if it exists
+	if (currentPopup) {
+		currentPopup.webContents.send('camera-mode', enabled);
+	}
 });
 
 ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
