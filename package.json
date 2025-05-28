@@ -57,11 +57,18 @@
 	"main": "dist-electron/main.js",
 	"build": {
 		"appId": "com.electron.react.tailwind",
+		"productName": "DryEye Blinker",
+		"files": [
+			"dist/**/*",
+			"python/**/*",
+			"electron/assets/models/**/*"
+		],
 		"mac": {
 			"target": [
 				"dmg",
 				"zip"
-			]
+			],
+			"category": "public.app-category.utilities"
 		},
 		"win": {
 			"target": [

@@ -27,19 +27,15 @@ def main():
     
     # Initialize dlib's face detector and facial landmark predictor
     detector = dlib.get_frontal_face_detector()
-    predictor_path = os.path.join(os.path.dirname(__file__), 'shape_predictor_68_face_landmarks.dat')
     
-    # Download the facial landmark predictor if it doesn't exist
+    # Get the model path relative to the app root
+    app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    predictor_path = os.path.join(app_root, 'electron', 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
+    
+    # Check if model exists
     if not os.path.exists(predictor_path):
-        print(json.dumps({"status": "Downloading facial landmark predictor..."}))
-        sys.stdout.flush()
-        import urllib.request
-        url = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
-        urllib.request.urlretrieve(url, predictor_path + ".bz2")
-        import bz2
-        with bz2.open(predictor_path + ".bz2", 'rb') as source, open(predictor_path, 'wb') as dest:
-            dest.write(source.read())
-        os.remove(predictor_path + ".bz2")
+        print(json.dumps({"error": "Facial landmark model not found. Please ensure the model file is present in electron/assets/models/"}))
+        sys.exit(1)
     
     predictor = dlib.shape_predictor(predictor_path)
     
