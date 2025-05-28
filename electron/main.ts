@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import Store from 'electron-store';
+import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 
 createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +41,10 @@ let currentPopup: BrowserWindow | null = null;
 let lastBlinkTime = Date.now();
 let cameraMonitoringInterval: NodeJS.Timeout | null = null;
 let isCameraMonitoring = false;
+
+// Add these variables at the top with other state variables
+let pythonProcess: any = null;
+let isPythonRunning = false;
 
 // Load all preferences from store
 const preferences = {
@@ -246,6 +252,12 @@ function showStoppedPopup() {
 async function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
 	preferences.reminderInterval = interval;
+	
+	// Start Python process if camera is enabled
+	if (preferences.cameraEnabled) {
+		startPythonBlinkDetector();
+	}
+	
 	while (blinkReminderActive) {
 		await new Promise((resolve) => {
 			showBlinkPopup();
@@ -253,6 +265,34 @@ async function startBlinkReminderLoop(interval: number) {
 		});
 		if (!blinkReminderActive) break;
 		await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
+	}
+}
+
+function stopBlinkReminderLoop() {
+	blinkReminderActive = false;
+	if (blinkIntervalId) {
+		clearInterval(blinkIntervalId);
+		blinkIntervalId = null;
+	}
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	
+	// Stop Python process if it's running
+	stopPythonBlinkDetector();
+	
+	// Close any existing popup immediately
+	if (currentPopup) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+	
+	// If camera was enabled, stop it
+	if (preferences.cameraEnabled) {
+		preferences.isTracking = false;
+		// Notify renderer to stop camera
+		win?.webContents.send('stop-camera');
 	}
 }
 
@@ -264,7 +304,7 @@ function registerGlobalShortcut(shortcut: string) {
 	globalShortcut.register(shortcut, () => {
 		preferences.isTracking = !preferences.isTracking;
 		if (preferences.isTracking) {
-			// Use the same start-blink-reminders logic as the button
+			// Start reminders
 			blinkReminderActive = false;
 			if (blinkIntervalId) clearInterval(blinkIntervalId);
 			if (cameraMonitoringInterval) clearInterval(cameraMonitoringInterval);
@@ -285,30 +325,8 @@ function registerGlobalShortcut(shortcut: string) {
 				startBlinkReminderLoop(preferences.reminderInterval);
 			}
 		} else {
-			// Use the same stop-blink-reminders logic as the button
-			blinkReminderActive = false;
-			if (blinkIntervalId) {
-				clearInterval(blinkIntervalId);
-				blinkIntervalId = null;
-			}
-			if (cameraMonitoringInterval) {
-				clearInterval(cameraMonitoringInterval);
-				cameraMonitoringInterval = null;
-			}
-			
-			// Close any existing popup immediately
-			if (currentPopup) {
-				currentPopup.close();
-				currentPopup = null;
-			}
-			
-			// If camera was enabled, stop it
-			if (preferences.cameraEnabled) {
-				preferences.isTracking = false;
-				// Notify renderer to stop camera
-				win?.webContents.send('stop-camera');
-			}
-			
+			// Stop reminders
+			stopBlinkReminderLoop();
 			showStoppedPopup();
 		}
 		// Notify the renderer process about the state change
@@ -319,6 +337,69 @@ function registerGlobalShortcut(shortcut: string) {
 	});
 }
 
+function startPythonBlinkDetector() {
+	if (isPythonRunning) return;
+
+	const pythonPath = path.join(process.env.APP_ROOT, 'python', 'blink_detector.py');
+	const venvPythonPath = path.join(process.env.APP_ROOT, 'python', 'venv', 'bin', 'python');
+	
+	// Use the virtual environment Python if it exists, otherwise fall back to system Python
+	const pythonExecutable = process.platform === 'win32' 
+		? path.join(process.env.APP_ROOT, 'python', 'venv', 'Scripts', 'python.exe')
+		: venvPythonPath;
+
+	// Check if virtual environment exists
+	if (!existsSync(pythonExecutable)) {
+		console.error('Python virtual environment not found. Please run setup.sh first.');
+		return;
+	}
+
+	console.log('Starting Python process with:', pythonExecutable);
+	pythonProcess = spawn(pythonExecutable, [pythonPath]);
+
+	pythonProcess.stdout.on('data', (data: Buffer) => {
+		try {
+			const message = JSON.parse(data.toString());
+			if (message.blink) {
+				console.log('Blink detected!', message);
+				// Handle blink detection
+				lastBlinkTime = Date.now();
+				if (currentPopup) {
+					currentPopup.close();
+					currentPopup = null;
+				}
+			} else if (message.error) {
+				console.error('Python error:', message.error);
+				stopPythonBlinkDetector();
+			} else if (message.status) {
+				console.log('Python status:', message);
+			}
+		} catch (error) {
+			console.error('Failed to parse Python output:', error);
+		}
+	});
+
+	pythonProcess.stderr.on('data', (data: Buffer) => {
+		console.error('Python stderr:', data.toString());
+	});
+
+	pythonProcess.on('close', (code: number) => {
+		console.log('Python process exited with code:', code);
+		isPythonRunning = false;
+		pythonProcess = null;
+	});
+
+	isPythonRunning = true;
+}
+
+function stopPythonBlinkDetector() {
+	if (pythonProcess) {
+		pythonProcess.kill();
+		pythonProcess = null;
+	}
+	isPythonRunning = false;
+}
+
 function startCameraMonitoring() {
 	if (cameraMonitoringInterval) {
 		clearInterval(cameraMonitoringInterval);
@@ -327,16 +408,23 @@ function startCameraMonitoring() {
 	// Reset the last blink time when starting monitoring
 	lastBlinkTime = Date.now();
 	
+	// Start Python process instead of using MediaPipe
+	startPythonBlinkDetector();
+	
 	cameraMonitoringInterval = setInterval(() => {
 		const timeSinceLastBlink = Date.now() - lastBlinkTime;
-		// Only show popup if:
-		// 1. No blink has been detected within the interval
-		// 2. There isn't already a popup showing
-		// 3. The time since last blink is exactly at or past the interval
 		if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
 			showBlinkPopup();
 		}
-	}, 100); // Check more frequently for more precise timing
+	}, 100);
+}
+
+function stopCameraMonitoring() {
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	stopPythonBlinkDetector();
 }
 
 // Camera-based blink detection IPC handlers
@@ -352,9 +440,7 @@ ipcMain.on("blink-detected", () => {
 });
 
 ipcMain.on("start-blink-reminders", (event, interval: number) => {
-	blinkReminderActive = false;
-	if (blinkIntervalId) clearInterval(blinkIntervalId);
-	if (cameraMonitoringInterval) clearInterval(cameraMonitoringInterval);
+	stopBlinkReminderLoop(); // Stop any existing processes first
 	
 	// Close any existing popup when starting/restarting
 	if (currentPopup) {
@@ -374,30 +460,7 @@ ipcMain.on("start-blink-reminders", (event, interval: number) => {
 });
 
 ipcMain.on("stop-blink-reminders", () => {
-	blinkReminderActive = false;
-	if (blinkIntervalId) {
-		clearInterval(blinkIntervalId);
-		blinkIntervalId = null;
-	}
-	if (cameraMonitoringInterval) {
-		clearInterval(cameraMonitoringInterval);
-		cameraMonitoringInterval = null;
-	}
-	
-	// Close any existing popup immediately
-	if (currentPopup) {
-		currentPopup.close();
-		currentPopup = null;
-	}
-	
-	// If camera was enabled, stop it
-	if (preferences.cameraEnabled) {
-		preferences.isTracking = false;
-		// Notify renderer to stop camera
-		win?.webContents.send('stop-camera');
-	}
-	
-	// Only show stopped popup if we successfully closed any existing popup
+	stopBlinkReminderLoop();
 	showStoppedPopup();
 });
 
@@ -441,6 +504,12 @@ ipcMain.on("start-camera-tracking", () => {
 	// Only update the preference flag
 	preferences.cameraEnabled = true;
 	store.set('cameraEnabled', true);
+	
+	// If reminders are active, restart them to enable camera
+	if (preferences.isTracking) {
+		stopBlinkReminderLoop();
+		startCameraMonitoring();
+	}
 });
 
 ipcMain.on("stop-camera-tracking", () => {
@@ -448,21 +517,17 @@ ipcMain.on("stop-camera-tracking", () => {
 	preferences.cameraEnabled = false;
 	store.set('cameraEnabled', false);
 	
-	// If reminders are active, stop the camera
+	// If reminders are active, restart them without camera
 	if (preferences.isTracking) {
-		stopCameraMonitoring();
-		// Notify renderer to stop camera
-		win?.webContents.send('stop-camera');
+		stopBlinkReminderLoop();
+		startBlinkReminderLoop(preferences.reminderInterval);
 	}
 });
 
-function stopCameraMonitoring() {
-	if (cameraMonitoringInterval) {
-		clearInterval(cameraMonitoringInterval);
-		cameraMonitoringInterval = null;
-	}
-	// Remove the showStoppedPopup call from here
-}
+// Add cleanup for Python process in the app quit handler
+app.on('before-quit', () => {
+	stopPythonBlinkDetector();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

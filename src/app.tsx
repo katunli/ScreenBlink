@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, Palette } from 'lucide-react';
-import { CameraBlinkDetector } from './components/CameraBlinkDetector';
 
 interface PopupColors {
   background: string;
@@ -310,23 +309,6 @@ export default function DryEyeHealthHomepage() {
                     <li>Reminders will only show if you haven't blinked within your set interval</li>
                     <li>No video is recorded or stored</li>
                   </ul>
-                </div>
-              )}
-
-              {/* Hidden Camera Component */}
-              {preferences.cameraEnabled && (
-                <div className="hidden">
-                  <CameraBlinkDetector
-                    isEnabled={preferences.isTracking}
-                    onBlinkDetected={() => {
-                      window.ipcRenderer?.send('blink-detected');
-                    }}
-                    onError={(error) => {
-                      console.error('Camera error:', error);
-                      setPreferences(prev => ({ ...prev, cameraEnabled: false }));
-                      window.ipcRenderer?.send('update-camera-enabled', false);
-                    }}
-                  />
                 </div>
               )}
             </div>
