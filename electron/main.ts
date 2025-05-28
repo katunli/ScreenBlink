@@ -45,6 +45,10 @@ let isCameraMonitoring = false;
 // Add these variables at the top with other state variables
 let pythonProcess: any = null;
 let isPythonRunning = false;
+let exerciseIntervalId: NodeJS.Timeout | null = null;
+let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
+let currentExercisePopup: BrowserWindow | null = null;
+let isExerciseShowing = false;
 
 // Load all preferences from store
 const preferences = {
@@ -54,9 +58,9 @@ const preferences = {
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
 	popupPosition: store.get('popupPosition', 'top-right') as string,
 	popupColors: store.get('popupColors', {
-		background: '#1E1E1E',
-		text: '#FFFFFF',
-		opacity: 0.5
+		background: '#FFFFFF',
+		text: '#00FF11',
+		opacity: 0.7
 	}) as {
 		background: string;
 		text: string;
@@ -505,6 +509,12 @@ ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
 ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
 	preferences.eyeExercisesEnabled = enabled;
 	store.set('eyeExercisesEnabled', enabled);
+	
+	if (enabled) {
+		startExerciseMonitoring();
+	} else {
+		stopExerciseMonitoring();
+	}
 });
 
 ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
@@ -547,9 +557,144 @@ ipcMain.on("update-blink-sensitivity", (event, sensitivity: number) => {
 	}
 });
 
+// Add this function to show the exercise popup
+function showExercisePopup() {
+	// Prevent overlapping exercises
+	if (isExerciseShowing || currentExercisePopup) {
+		return;
+	}
+
+	isExerciseShowing = true;
+
+	// Close any existing exercise popup (extra safety)
+	if (currentExercisePopup) {
+		(currentExercisePopup as BrowserWindow).close();
+		currentExercisePopup = null;
+	}
+
+	const display = screen.getPrimaryDisplay();
+	const { width, height } = display.workAreaSize;
+	const popupWidth = 340;
+	const popupHeight = 200;
+
+	// Position in the middle of the screen
+	const x = Math.floor((width - popupWidth) / 2);
+	const y = Math.floor((height - popupHeight) / 2);
+
+	const popup = new BrowserWindow({
+		width: popupWidth,
+		height: popupHeight,
+		x,
+		y,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		resizable: false,
+		skipTaskbar: true,
+		focusable: true,
+		show: false,
+		hasShadow: false,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
+	});
+
+	currentExercisePopup = popup;
+	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "exercise.html"));
+	
+	popup.webContents.on('did-finish-load', () => {
+		popup.webContents.send('update-colors', { darkMode: preferences.darkMode });
+	});
+	
+	popup.once("ready-to-show", () => {
+		popup.show();
+	});
+
+	// Handle window close
+	popup.on('closed', () => {
+		if (currentExercisePopup === popup) {
+			currentExercisePopup = null;
+			isExerciseShowing = false;
+		}
+	});
+
+	// Auto-close after 1 minute
+	setTimeout(() => {
+		if (currentExercisePopup === popup) {
+			popup.close();
+			currentExercisePopup = null;
+			isExerciseShowing = false;
+		}
+	}, 60000);
+}
+
+// Add this function to start exercise monitoring
+function startExerciseMonitoring() {
+	if (exerciseIntervalId) {
+		clearInterval(exerciseIntervalId);
+	}
+
+	// Check every minute
+	exerciseIntervalId = setInterval(() => {
+		const now = Date.now();
+		const timeSinceLastExercise = now - (store.get('lastExerciseTime', 0) as number);
+
+		// Show exercise every 20 minutes
+		if (preferences.eyeExercisesEnabled && 
+			!isExerciseShowing && 
+			timeSinceLastExercise >= 20 * 60 * 1000) {
+			showExercisePopup();
+			store.set('lastExerciseTime', now);
+		}
+	}, 60 * 1000); // Check every minute
+}
+
+// Add this function to stop exercise monitoring
+function stopExerciseMonitoring() {
+	if (exerciseIntervalId) {
+		clearInterval(exerciseIntervalId);
+		exerciseIntervalId = null;
+	}
+	if (exerciseSnoozeTimeout) {
+		clearTimeout(exerciseSnoozeTimeout);
+		exerciseSnoozeTimeout = null;
+	}
+	if (currentExercisePopup) {
+		(currentExercisePopup as BrowserWindow).close();
+		currentExercisePopup = null;
+	}
+	isExerciseShowing = false;
+}
+
+// Add these IPC handlers
+ipcMain.on("skip-exercise", () => {
+	if (currentExercisePopup) {
+		(currentExercisePopup as BrowserWindow).close();
+		currentExercisePopup = null;
+		isExerciseShowing = false;
+	}
+	store.set('lastExerciseTime', Date.now());
+});
+
+ipcMain.on("snooze-exercise", () => {
+	if (currentExercisePopup) {
+		(currentExercisePopup as BrowserWindow).close();
+		currentExercisePopup = null;
+		isExerciseShowing = false;
+	}
+	if (exerciseSnoozeTimeout) {
+		clearTimeout(exerciseSnoozeTimeout);
+	}
+	exerciseSnoozeTimeout = setTimeout(() => {
+		showExercisePopup();
+	}, 5 * 60 * 1000); // Snooze for 5 minutes
+});
+
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
 	stopPythonBlinkDetector();
+	stopExerciseMonitoring();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -574,4 +719,9 @@ app.whenReady().then(() => {
 	createWindow();
 	// Register the initial shortcut
 	registerGlobalShortcut(preferences.keyboardShortcut);
+	
+	// Start exercise monitoring if enabled
+	if (preferences.eyeExercisesEnabled) {
+		startExerciseMonitoring();
+	}
 });

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: transparent;
+            overflow: hidden;
+            user-select: none;
+        }
+        .container {
+            width: 300px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+        }
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 15px;
+        }
+        .exercise {
+            font-size: 16px;
+            color: #4a4a4a;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .skip {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+        .skip:hover {
+            background: #e5e7eb;
+        }
+        .snooze {
+            background: #3b82f6;
+            color: white;
+        }
+        .snooze:hover {
+            background: #2563eb;
+        }
+        .dark-mode {
+            background: rgba(31, 41, 55, 0.95);
+        }
+        .dark-mode .title {
+            color: #f3f4f6;
+        }
+        .dark-mode .exercise {
+            color: #d1d5db;
+        }
+        .dark-mode .skip {
+            background: #374151;
+            color: #e5e7eb;
+        }
+        .dark-mode .skip:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <div class="title">Eye Exercise Time!</div>
+        <div class="exercise" id="exercise"></div>
+        <div class="buttons">
+            <button class="skip" onclick="skipExercise()">Skip</button>
+            <button class="snooze" onclick="snoozeExercise()">Snooze (5 min)</button>
+        </div>
+    </div>
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        const exercises = [
+            "Close your eyes and gently roll them in a circular motion for 10 seconds. Then reverse direction.",
+            "Blink rapidly for 10 seconds, then close your eyes and relax for 10 seconds.",
+            "Look up and down slowly 5 times, then left and right 5 times.",
+            "Focus on a distant object for 20 seconds, then focus on something close for 20 seconds.",
+            "Massage your temples in a circular motion for 30 seconds.",
+            "Cover your eyes with your palms for 30 seconds, letting them rest in complete darkness.",
+            "Look at the corners of your screen in a figure-8 pattern for 30 seconds.",
+            "Take a deep breath and yawn naturally a few times to help lubricate your eyes."
+        ];
+
+        let currentExercise = exercises[Math.floor(Math.random() * exercises.length)];
+        document.getElementById('exercise').textContent = currentExercise;
+
+        function skipExercise() {
+            ipcRenderer.send('skip-exercise');
+            window.close();
+        }
+
+        function snoozeExercise() {
+            ipcRenderer.send('snooze-exercise');
+            window.close();
+        }
+
+        // Listen for dark mode updates
+        ipcRenderer.on('update-colors', (event, colors) => {
+            const container = document.getElementById('container');
+            if (colors.darkMode) {
+                container.classList.add('dark-mode');
+            } else {
+                container.classList.remove('dark-mode');
+            }
+        });
+    </script>
+</body>
+</html>

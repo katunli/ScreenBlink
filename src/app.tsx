@@ -392,7 +392,7 @@ export default function DryEyeHealthHomepage() {
                   </button>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  Get prompted for eye exercises at different intervals to help reduce eye strain
+                  Get prompted for eye exercises every 20 minutes to help reduce eye strain
                 </p>
                 {preferences.eyeExercisesEnabled && (
                   <div className="mt-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
