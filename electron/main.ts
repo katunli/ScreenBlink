@@ -501,27 +501,27 @@ ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
 });
 
 ipcMain.on("start-camera-tracking", () => {
-	// Only update the preference flag
-	preferences.cameraEnabled = true;
-	store.set('cameraEnabled', true);
-	
-	// If reminders are active, restart them to enable camera
+	// If reminders are active, stop them first
 	if (preferences.isTracking) {
 		stopBlinkReminderLoop();
-		startCameraMonitoring();
+		showStoppedPopup();
 	}
+	
+	// Update the preference flag
+	preferences.cameraEnabled = true;
+	store.set('cameraEnabled', true);
 });
 
 ipcMain.on("stop-camera-tracking", () => {
-	// Only update the preference flag
-	preferences.cameraEnabled = false;
-	store.set('cameraEnabled', false);
-	
-	// If reminders are active, restart them without camera
+	// If reminders are active, stop them first
 	if (preferences.isTracking) {
 		stopBlinkReminderLoop();
-		startBlinkReminderLoop(preferences.reminderInterval);
+		showStoppedPopup();
 	}
+	
+	// Update the preference flag
+	preferences.cameraEnabled = false;
+	store.set('cameraEnabled', false);
 });
 
 // Add cleanup for Python process in the app quit handler

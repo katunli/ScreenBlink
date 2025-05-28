@@ -274,18 +274,32 @@ export default function DryEyeHealthHomepage() {
                     
                     // If reminders are active, stop them first
                     if (preferences.isTracking) {
-                      setPreferences(prev => ({ ...prev, isTracking: false }));
                       window.ipcRenderer?.send('stop-blink-reminders');
-                    }
-                    
-                    // Update camera preference
-                    setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
-                    
-                    // Send appropriate camera tracking message
-                    if (newCameraEnabled) {
-                      window.ipcRenderer?.send('start-camera-tracking');
+                      // Wait a brief moment to ensure reminders are stopped before updating camera setting
+                      setTimeout(() => {
+                        setPreferences(prev => ({ 
+                          ...prev, 
+                          isTracking: false,
+                          cameraEnabled: newCameraEnabled 
+                        }));
+                        
+                        // Send appropriate camera tracking message
+                        if (newCameraEnabled) {
+                          window.ipcRenderer?.send('start-camera-tracking');
+                        } else {
+                          window.ipcRenderer?.send('stop-camera-tracking');
+                        }
+                      }, 100);
                     } else {
-                      window.ipcRenderer?.send('stop-camera-tracking');
+                      // If reminders are not active, just update the camera setting
+                      setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
+                      
+                      // Send appropriate camera tracking message
+                      if (newCameraEnabled) {
+                        window.ipcRenderer?.send('start-camera-tracking');
+                      } else {
+                        window.ipcRenderer?.send('stop-camera-tracking');
+                      }
                     }
                   }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
