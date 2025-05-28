@@ -6,9 +6,10 @@ import sys
 import os
 import dlib
 from pathlib import Path
+import select
 
 # Constants
-EAR_THRESHOLD = 0.25
+EAR_THRESHOLD = 0.25  # Default value
 BLINK_COOLDOWN = 0.5  # seconds
 
 def calculate_ear(eye_points):
@@ -53,9 +54,26 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     
     last_blink_time = time.time()
+    current_ear_threshold = EAR_THRESHOLD
     
     try:
         while True:
+            # Check for new threshold value from stdin
+            if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                try:
+                    line = sys.stdin.readline()
+                    if line:
+                        data = json.loads(line)
+                        if 'ear_threshold' in data:
+                            current_ear_threshold = float(data['ear_threshold'])
+                            print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
+                            sys.stdout.flush()
+                except json.JSONDecodeError:
+                    pass
+                except Exception as e:
+                    print(json.dumps({"error": f"Error processing input: {str(e)}"}))
+                    sys.stdout.flush()
+            
             ret, frame = cap.read()
             if not ret:
                 print(json.dumps({"error": "Failed to read frame"}))
@@ -85,8 +103,8 @@ def main():
                 
                 current_time = time.time()
                 
-                # Check for blink
-                if avg_ear < EAR_THRESHOLD and (current_time - last_blink_time) > BLINK_COOLDOWN:
+                # Check for blink using current threshold
+                if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
                     last_blink_time = current_time
                     print(json.dumps({
                         "blink": True,

@@ -63,7 +63,8 @@ const preferences = {
 		opacity: number;
 	},
 	isTracking: false,
-	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+Shift+B') as string
+	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+Shift+B') as string,
+	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number
 };
 
 function createWindow() {
@@ -356,7 +357,9 @@ function startPythonBlinkDetector() {
 	}
 
 	console.log('Starting Python process with:', pythonExecutable);
-	pythonProcess = spawn(pythonExecutable, [pythonPath]);
+	pythonProcess = spawn(pythonExecutable, [pythonPath], {
+		stdio: ['pipe', 'pipe', 'pipe']
+	});
 
 	pythonProcess.stdout.on('data', (data: Buffer) => {
 		try {
@@ -374,6 +377,10 @@ function startPythonBlinkDetector() {
 				stopPythonBlinkDetector();
 			} else if (message.status) {
 				console.log('Python status:', message);
+				// If the process is ready, send the initial sensitivity value
+				if (message.status === "Camera opened successfully" && pythonProcess.stdin) {
+					pythonProcess.stdin.write(JSON.stringify({ ear_threshold: preferences.blinkSensitivity }) + '\n');
+				}
 			}
 		} catch (error) {
 			console.error('Failed to parse Python output:', error);
@@ -528,6 +535,16 @@ ipcMain.on("stop-camera-tracking", () => {
 	// Update the preference flag
 	preferences.cameraEnabled = false;
 	store.set('cameraEnabled', false);
+});
+
+ipcMain.on("update-blink-sensitivity", (event, sensitivity: number) => {
+	preferences.blinkSensitivity = sensitivity;
+	store.set('blinkSensitivity', sensitivity);
+	
+	// Send the new threshold to the Python process if it's running
+	if (pythonProcess && pythonProcess.stdin) {
+		pythonProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
+	}
 });
 
 // Add cleanup for Python process in the app quit handler

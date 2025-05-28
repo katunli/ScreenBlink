@@ -29,7 +29,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-keyboard-shortcut',
       'blink-detected',
       'start-camera-tracking',
-      'stop-camera-tracking'
+      'stop-camera-tracking',
+      'update-blink-sensitivity'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

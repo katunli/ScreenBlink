@@ -16,6 +16,7 @@ interface UserPreferences {
   popupColors: PopupColors;
   isTracking: boolean;
   keyboardShortcut: string;
+  blinkSensitivity: number;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -30,7 +31,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     opacity: 0.5
   },
   isTracking: false,
-  keyboardShortcut: 'Ctrl+Shift+B'
+  keyboardShortcut: 'Ctrl+Shift+B',
+  blinkSensitivity: 0.2
 };
 
 export default function DryEyeHealthHomepage() {
@@ -314,12 +316,50 @@ export default function DryEyeHealthHomepage() {
                 </button>
               </div>
 
+              {/* Blink Detection Sensitivity - Only shown when camera is enabled */}
+              {preferences.cameraEnabled && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Blink Detection Sensitivity</span>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.4"
+                        step="0.01"
+                        value={preferences.blinkSensitivity}
+                        onChange={(e) => {
+                          const newSensitivity = parseFloat(e.target.value);
+                          setPreferences(prev => ({ ...prev, blinkSensitivity: newSensitivity }));
+                          window.ipcRenderer?.send('update-blink-sensitivity', newSensitivity);
+                        }}
+                        className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(preferences.blinkSensitivity - 0.1) / 0.3 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} ${(preferences.blinkSensitivity - 0.1) / 0.3 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
+                        }}
+                      />
+                      <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full font-semibold min-w-[80px] text-center">
+                        {preferences.blinkSensitivity.toFixed(2)}
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      Adjust how sensitive the blink detection is. Higher values make it more sensitive to blinks, while lower values will require more pronounced blinks to be detected.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Camera Description */}
               {preferences.cameraEnabled && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-200">
-                  <p className="mb-2">Camera eye tracking is enabled. The camera will only activate when you start reminders. Changing this setting will pause the reminders.</p>
+                  <p className="mb-2">Camera eye tracking is enabled. The camera will only activate when you start reminders. Toggling this will pause the reminders.</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>The camera will detect when you blink and close reminders</li>
+                    <li>The camera will detect when you blink and then close reminders</li>
                     <li>Reminders will only show if you haven't blinked within your set interval</li>
                     <li>No video is recorded or stored</li>
                   </ul>
