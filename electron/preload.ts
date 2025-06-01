@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'stop-camera-tracking',
       'update-blink-sensitivity',
       'skip-exercise',
-      'snooze-exercise'
+      'snooze-exercise',
+      'update-mgd-mode'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

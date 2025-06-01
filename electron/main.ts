@@ -52,6 +52,7 @@ let isExerciseShowing = false;
 let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
 let frameCount = 0;
 const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
+let mgdReminderLoopActive = false;
 
 // Load all preferences from store
 const preferences = {
@@ -71,7 +72,8 @@ const preferences = {
 	},
 	isTracking: false,
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+Shift+B') as string,
-	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number
+	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
+	mgdMode: store.get('mgdMode', false) as boolean
 };
 
 function createWindow() {
@@ -450,27 +452,56 @@ function startCameraMonitoring() {
 	// Start Python process instead of using MediaPipe
 	startPythonBlinkDetector();
 	
-	cameraMonitoringInterval = setInterval(() => {
-		const timeSinceLastBlink = Date.now() - lastBlinkTime;
-		if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
-			showBlinkPopup();
-			// Auto-close popup after 2.5 seconds
-			setTimeout(() => {
-				try {
-					if (currentPopup && !currentPopup.isDestroyed()) {
-						currentPopup.close();
+	if (preferences.mgdMode) {
+		// In MGD mode, use the same interval-based approach as startBlinkReminderLoop
+		mgdReminderLoopActive = true;
+		async function mgdReminderLoop() {
+			while (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode) {
+				await new Promise((resolve) => {
+					showBlinkPopup();
+					// Always close popup after 2.5 seconds in MGD mode
+					setTimeout(() => {
+						try {
+							if (currentPopup && !currentPopup.isDestroyed()) {
+								currentPopup.close();
+								currentPopup = null;
+							}
+						} catch (error) {
+							console.log('Popup already destroyed');
+							currentPopup = null;
+						}
+						resolve(null);
+					}, 2500);
+				});
+				if (!mgdReminderLoopActive || !preferences.isTracking || !preferences.mgdMode) break;
+				await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
+			}
+		}
+		mgdReminderLoop();
+	} else {
+		// Normal mode - only show popup if no blink detected
+		cameraMonitoringInterval = setInterval(() => {
+			const timeSinceLastBlink = Date.now() - lastBlinkTime;
+			if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
+				showBlinkPopup();
+				// Auto-close popup after 2.5 seconds
+				setTimeout(() => {
+					try {
+						if (currentPopup && !currentPopup.isDestroyed()) {
+							currentPopup.close();
+							currentPopup = null;
+							// Update lastBlinkTime when popup closes
+							lastBlinkTime = Date.now();
+						}
+					} catch (error) {
+						console.log('Popup already destroyed');
 						currentPopup = null;
-						// Update lastBlinkTime when popup closes
 						lastBlinkTime = Date.now();
 					}
-				} catch (error) {
-					console.log('Popup already destroyed');
-					currentPopup = null;
-					lastBlinkTime = Date.now();
-				}
-			}, 2500);
-		}
-	}, 100); // Check every 100ms	
+				}, 2500);
+			}
+		}, 100); // Check every 100ms
+	}
 }
 
 function stopCameraMonitoring() {
@@ -478,6 +509,7 @@ function stopCameraMonitoring() {
 		clearInterval(cameraMonitoringInterval);
 		cameraMonitoringInterval = null;
 	}
+	mgdReminderLoopActive = false;
 	stopPythonBlinkDetector();
 }
 
@@ -486,15 +518,17 @@ ipcMain.on("blink-detected", () => {
 	// Update last blink time
 	lastBlinkTime = Date.now();
 	
-	// Close any existing popup when a blink is detected
-	try {
-		if (currentPopup && !currentPopup.isDestroyed()) {
-			currentPopup.close();
+	// Only close popup in normal mode (not MGD mode)
+	if (!preferences.mgdMode) {
+		try {
+			if (currentPopup && !currentPopup.isDestroyed()) {
+				currentPopup.close();
+				currentPopup = null;
+			}
+		} catch (error) {
+			console.log('Popup already destroyed');
 			currentPopup = null;
 		}
-	} catch (error) {
-		console.log('Popup already destroyed');
-		currentPopup = null;
 	}
 });
 
@@ -744,6 +778,12 @@ ipcMain.on("snooze-exercise", () => {
 	exerciseSnoozeTimeout = setTimeout(() => {
 		showExercisePopup();
 	}, 5 * 60 * 1000); // Snooze for 5 minutes
+});
+
+// Add this IPC handler
+ipcMain.on("update-mgd-mode", (event, enabled: boolean) => {
+	preferences.mgdMode = enabled;
+	store.set('mgdMode', enabled);
 });
 
 // Add cleanup for Python process in the app quit handler

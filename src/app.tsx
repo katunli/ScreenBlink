@@ -17,6 +17,8 @@ interface UserPreferences {
   isTracking: boolean;
   keyboardShortcut: string;
   blinkSensitivity: number;
+  mgdMode: boolean;
+  showMgdInfo: boolean;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -32,7 +34,9 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   },
   isTracking: false,
   keyboardShortcut: 'Ctrl+Shift+B',
-  blinkSensitivity: 0.2
+  blinkSensitivity: 0.2,
+  mgdMode: false,
+  showMgdInfo: false
 };
 
 export default function DryEyeHealthHomepage() {
@@ -350,6 +354,62 @@ export default function DryEyeHealthHomepage() {
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       Adjust how sensitive the blink detection is. Higher values make it more sensitive to blinks, while lower values will require more pronounced blinks to be detected.
                     </p>
+                  </div>
+
+                  {/* MGD Toggle */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Meibomian Gland Dysfunction (MGD) Mode</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newMgdMode = !preferences.mgdMode;
+                          // If reminders are active, stop them first
+                          if (preferences.isTracking) {
+                            window.ipcRenderer?.send('stop-blink-reminders');
+                            setPreferences(prev => ({ 
+                              ...prev, 
+                              isTracking: false,
+                              mgdMode: newMgdMode 
+                            }));
+                          } else {
+                            setPreferences(prev => ({ ...prev, mgdMode: newMgdMode }));
+                          }
+                          window.ipcRenderer?.send('update-mgd-mode', newMgdMode);
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          preferences.mgdMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            preferences.mgdMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPreferences(prev => ({ ...prev, showMgdInfo: !prev.showMgdInfo }))}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                      >
+                        {preferences.showMgdInfo ? 'Hide Info' : 'Learn More'}
+                      </button>
+                      {preferences.mgdMode && (
+                        <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
+                          MGD mode is active
+                        </span>
+                      )}
+                    </div>
+                    {preferences.showMgdInfo && (
+                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                          MGD is a common condition where the meibomian glands in your eyelids don't produce enough oil, leading to dry eyes. When enabled, reminders will appear at regular intervals regardless of detected blinks, helping you maintain a consistent blinking pattern and express the meibomian glands more effectively. The popup will still close when a blink is detected.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
