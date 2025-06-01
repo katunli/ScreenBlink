@@ -49,6 +49,9 @@ let exerciseIntervalId: NodeJS.Timeout | null = null;
 let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
+let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
+let frameCount = 0;
+const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
 
 // Load all preferences from store
 const preferences = {
@@ -365,29 +368,52 @@ function startPythonBlinkDetector() {
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
 
+	let buffer = '';
 	pythonProcess.stdout.on('data', (data: Buffer) => {
-		try {
-			const message = JSON.parse(data.toString());
-			if (message.blink) {
-				console.log('Blink detected!', message);
-				// Handle blink detection
-				lastBlinkTime = Date.now();
-				if (currentPopup) {
-					currentPopup.close();
-					currentPopup = null;
+		buffer += data.toString();
+		
+		// Process complete JSON messages
+		let newlineIndex;
+		while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+			const message = buffer.slice(0, newlineIndex);
+			buffer = buffer.slice(newlineIndex + 1);
+			
+			try {
+				const parsed = JSON.parse(message);
+				if (parsed.blink) {
+					frameCount++;
+					if (frameCount % FRAME_SKIP !== 0) {
+						continue;
+					}
+
+					console.log('Blink detected!', parsed);
+					// Handle blink detection
+					lastBlinkTime = Date.now();
+					try {
+						if (currentPopup && !currentPopup.isDestroyed()) {
+							currentPopup.close();
+							currentPopup = null;
+						}
+					} catch (error) {
+						console.log('Popup already destroyed');
+						currentPopup = null;
+					}
+				} else if (parsed.error) {
+					console.error('Python error:', parsed.error);
+					stopPythonBlinkDetector();
+				} else if (parsed.status) {
+					console.log('Python status:', parsed);
+					// If the process is ready, send the initial sensitivity value
+					if (parsed.status === "Camera opened successfully" && pythonProcess.stdin) {
+						pythonProcess.stdin.write(JSON.stringify({ 
+							ear_threshold: preferences.blinkSensitivity,
+							frame_skip: FRAME_SKIP // Send frame skip setting to Python
+						}) + '\n');
+					}
 				}
-			} else if (message.error) {
-				console.error('Python error:', message.error);
-				stopPythonBlinkDetector();
-			} else if (message.status) {
-				console.log('Python status:', message);
-				// If the process is ready, send the initial sensitivity value
-				if (message.status === "Camera opened successfully" && pythonProcess.stdin) {
-					pythonProcess.stdin.write(JSON.stringify({ ear_threshold: preferences.blinkSensitivity }) + '\n');
-				}
+			} catch (error) {
+				console.error('Failed to parse Python output:', error);
 			}
-		} catch (error) {
-			console.error('Failed to parse Python output:', error);
 		}
 	});
 
@@ -419,6 +445,7 @@ function startCameraMonitoring() {
 	
 	// Reset the last blink time when starting monitoring
 	lastBlinkTime = Date.now();
+	frameCount = 0;
 	
 	// Start Python process instead of using MediaPipe
 	startPythonBlinkDetector();
@@ -427,8 +454,23 @@ function startCameraMonitoring() {
 		const timeSinceLastBlink = Date.now() - lastBlinkTime;
 		if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
 			showBlinkPopup();
+			// Auto-close popup after 2.5 seconds
+			setTimeout(() => {
+				try {
+					if (currentPopup && !currentPopup.isDestroyed()) {
+						currentPopup.close();
+						currentPopup = null;
+						// Update lastBlinkTime when popup closes
+						lastBlinkTime = Date.now();
+					}
+				} catch (error) {
+					console.log('Popup already destroyed');
+					currentPopup = null;
+					lastBlinkTime = Date.now();
+				}
+			}, 2500);
 		}
-	}, 100);
+	}, 100); // Check every 100ms	
 }
 
 function stopCameraMonitoring() {
@@ -445,8 +487,13 @@ ipcMain.on("blink-detected", () => {
 	lastBlinkTime = Date.now();
 	
 	// Close any existing popup when a blink is detected
-	if (currentPopup) {
-		currentPopup.close();
+	try {
+		if (currentPopup && !currentPopup.isDestroyed()) {
+			currentPopup.close();
+			currentPopup = null;
+		}
+	} catch (error) {
+		console.log('Popup already destroyed');
 		currentPopup = null;
 	}
 });
@@ -551,10 +598,18 @@ ipcMain.on("update-blink-sensitivity", (event, sensitivity: number) => {
 	preferences.blinkSensitivity = sensitivity;
 	store.set('blinkSensitivity', sensitivity);
 	
-	// Send the new threshold to the Python process if it's running
-	if (pythonProcess && pythonProcess.stdin) {
-		pythonProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
+	// Clear any existing timeout
+	if (earThresholdUpdateTimeout) {
+		clearTimeout(earThresholdUpdateTimeout);
 	}
+	
+	// Set a new timeout to update the threshold after 500ms of no changes
+	earThresholdUpdateTimeout = setTimeout(() => {
+		// Send the new threshold to the Python process if it's running
+		if (pythonProcess && pythonProcess.stdin) {
+			pythonProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
+		}
+	}, 500);
 });
 
 // Add this function to show the exercise popup
@@ -626,7 +681,7 @@ function showExercisePopup() {
 			currentExercisePopup = null;
 			isExerciseShowing = false;
 		}
-	}, 60000);
+	}, 15000);
 }
 
 // Add this function to start exercise monitoring
@@ -695,6 +750,10 @@ ipcMain.on("snooze-exercise", () => {
 app.on('before-quit', () => {
 	stopPythonBlinkDetector();
 	stopExerciseMonitoring();
+	if (earThresholdUpdateTimeout) {
+		clearTimeout(earThresholdUpdateTimeout);
+		earThresholdUpdateTimeout = null;
+	}
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -361,6 +361,7 @@ export default function DryEyeHealthHomepage() {
                   <ul className="list-disc list-inside space-y-1">
                     <li>The camera will detect when you blink and then close reminders</li>
                     <li>Reminders will only show if you haven't blinked within your set interval</li>
+                    <li>Works best in well-lit environments</li>
                     <li>No video is recorded or stored</li>
                   </ul>
                 </div>
