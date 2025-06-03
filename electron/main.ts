@@ -420,8 +420,14 @@ function showCameraWindow() {
 		}
 	});
 	
+	// Handle window close event
 	cameraWindow.on('closed', () => {
 		cameraWindow = null;
+		notifyCameraWindowClosed();
+	});
+
+	// Handle window close button click
+	cameraWindow.on('close', () => {
 		notifyCameraWindowClosed();
 	});
 }

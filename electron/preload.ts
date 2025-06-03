@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'main-process-message', 
       'load-preferences',
       'camera-error',
-      'video-stream'
+      'video-stream',
+      'camera-window-closed'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
