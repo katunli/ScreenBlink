@@ -39,7 +39,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   showMgdInfo: false
 };
 
-export default function DryEyeHealthHomepage() {
+export default function ScreenBlinkHomepage() {
   useEffect(() => {
     // Add the animation style
     const style = document.createElement('style');
@@ -185,7 +185,7 @@ export default function DryEyeHealthHomepage() {
         <div className="text-center mb-6 sm:mb-8">
           <div className="flex justify-center items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
             <Eye className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">DryEyeHealth</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">ScreenBlink</h1>
           </div>
           <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-4">Keep your eyes healthy with smart blink reminders</p>
         </div>

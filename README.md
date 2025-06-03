@@ -1,4 +1,4 @@
-# DryEye Blinker
+# ScreenBlink
 
 A desktop application to help prevent dry eyes by reminding you to blink regularly.
 
