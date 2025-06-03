@@ -503,26 +503,17 @@ export default function DryEyeHealthHomepage() {
                     <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Position</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((pos) => (
-                    <button
-                      key={pos}
-                      onClick={() => {
-                        setPreferences(prev => ({ ...prev, popupPosition: pos }));
-                        window.ipcRenderer?.send('update-popup-position', pos);
-                      }}
-                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                        preferences.popupPosition === pos
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                      }`}
-                    >
-                      {pos.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </button>
-                  ))}
+                <div className="mt-2">
+                  <button
+                    onClick={() => window.ipcRenderer?.send('show-position-editor')}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Change Reminder Position
+                  </button>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Choose where the blink reminder popup appears on your screen
+                  Click to drag and position the reminder popup anywhere on your screen
                 </p>
               </div>
 

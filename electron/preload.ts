@@ -36,7 +36,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'snooze-exercise',
       'update-mgd-mode',
       'show-camera-window',
-      'close-camera-window'
+      'close-camera-window',
+      'show-position-editor',
+      'position-saved'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

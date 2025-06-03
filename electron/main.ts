@@ -55,13 +55,16 @@ const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
 
+let positionEditorWindow: BrowserWindow | null = null;
+let positionUpdateTimeout: NodeJS.Timeout | null = null;
+
 // Load all preferences from store
 const preferences = {
 	darkMode: store.get('darkMode', false) as boolean,
 	reminderInterval: store.get('reminderInterval', 5000) as number,
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
-	popupPosition: store.get('popupPosition', 'top-right') as string,
+	popupPosition: store.get('popupPosition', { x: 40, y: 40 }) as { x: number, y: number },
 	popupColors: store.get('popupColors', {
 		background: '#FFFFFF',
 		text: '#00FF11',
@@ -121,28 +124,9 @@ function showBlinkPopup() {
 	const popupWidth = 220;
 	const popupHeight = 80;
 	
-	// Calculate position based on settings
-	let x = 40;
-	let y = 40;
-	
-	switch (preferences.popupPosition) {
-		case 'top-left':
-			x = 40;
-			y = 40;
-			break;
-		case 'top-right':
-			x = width - popupWidth - 40;
-			y = 40;
-			break;
-		case 'bottom-left':
-			x = 40;
-			y = height - popupHeight - 40;
-			break;
-		case 'bottom-right':
-			x = width - popupWidth - 40;
-			y = height - popupHeight - 40;
-			break;
-	}
+	// Use stored position
+	const x = preferences.popupPosition.x;
+	const y = preferences.popupPosition.y;
 
 	const popup = new BrowserWindow({
 		width: popupWidth,
@@ -199,28 +183,9 @@ function showStoppedPopup() {
 	const popupWidth = 220;
 	const popupHeight = 80;
 	
-	// Calculate position based on settings
-	let x = 40;
-	let y = 40;
-	
-	switch (preferences.popupPosition) {
-		case 'top-left':
-			x = 40;
-			y = 40;
-			break;
-		case 'top-right':
-			x = width - popupWidth - 40;
-			y = 40;
-			break;
-		case 'bottom-left':
-			x = 40;
-			y = height - popupHeight - 40;
-			break;
-		case 'bottom-right':
-			x = width - popupWidth - 40;
-			y = height - popupHeight - 40;
-			break;
-	}
+	// Use stored position
+	const x = preferences.popupPosition.x;
+	const y = preferences.popupPosition.y;
 
 	const popup = new BrowserWindow({
 		width: popupWidth,
@@ -259,6 +224,79 @@ function showStoppedPopup() {
 			currentPopup = null;
 		}
 	}, 2500);
+}
+
+function showPositionEditor() {
+	if (positionEditorWindow) {
+		positionEditorWindow.focus();
+		return;
+	}
+
+	const display = screen.getPrimaryDisplay();
+	const popupWidth = 220; // Match blink popup width
+	const popupHeight = 80; // Match blink popup height
+
+	// Start at current popup position
+	const x = preferences.popupPosition.x;
+	const y = preferences.popupPosition.y;
+
+	positionEditorWindow = new BrowserWindow({
+		width: popupWidth,
+		height: popupHeight,
+		x,
+		y,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		resizable: false,
+		skipTaskbar: true,
+		focusable: true,
+		show: false,
+		hasShadow: false,
+		movable: true,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
+	});
+
+	positionEditorWindow.loadFile(path.join(process.env.APP_ROOT, "electron", "position-editor.html"));
+	
+	positionEditorWindow.webContents.on('did-finish-load', () => {
+		positionEditorWindow?.webContents.send('update-colors', preferences.popupColors);
+		positionEditorWindow?.webContents.send('current-position', preferences.popupPosition);
+	});
+	
+	positionEditorWindow.once("ready-to-show", () => {
+		positionEditorWindow?.show();
+	});
+
+	// Handle window movement
+	positionEditorWindow.on('moved', () => {
+		if (positionEditorWindow) {
+			const [x, y] = positionEditorWindow.getPosition();
+			
+			// Clear any existing timeout
+			if (positionUpdateTimeout) {
+				clearTimeout(positionUpdateTimeout);
+			}
+			
+			// Set a new timeout to update the position after 500ms of no movement
+			positionUpdateTimeout = setTimeout(() => {
+				preferences.popupPosition = { x, y };
+				store.set('popupPosition', { x, y });
+				positionEditorWindow?.webContents.send('position-saved', { x, y });
+			}, 500);
+		}
+	});
+
+	positionEditorWindow.on('closed', () => {
+		positionEditorWindow = null;
+		if (positionUpdateTimeout) {
+			clearTimeout(positionUpdateTimeout);
+			positionUpdateTimeout = null;
+		}
+	});
 }
 
 async function startBlinkReminderLoop(interval: number) {
@@ -612,7 +650,7 @@ ipcMain.on("stop-blink-reminders", () => {
 	showStoppedPopup();
 });
 
-ipcMain.on("update-popup-position", (event, position: string) => {
+ipcMain.on("update-popup-position", (event, position: { x: number, y: number }) => {
 	preferences.popupPosition = position;
 	store.set('popupPosition', position);
 });
@@ -897,4 +935,9 @@ ipcMain.on('close-camera-window', () => {
 		cameraWindow.close();
 		cameraWindow = null;
 	}
+});
+
+// Add new IPC handler for showing position editor
+ipcMain.on("show-position-editor", () => {
+	showPositionEditor();
 });
