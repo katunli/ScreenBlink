@@ -53,6 +53,7 @@ let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
 let frameCount = 0;
 const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
 let mgdReminderLoopActive = false;
+let cameraWindow: BrowserWindow | null = null;
 
 // Load all preferences from store
 const preferences = {
@@ -348,6 +349,45 @@ function registerGlobalShortcut(shortcut: string) {
 	});
 }
 
+function showCameraWindow() {
+	if (cameraWindow) {
+		cameraWindow.focus();
+		return;
+	}
+
+	const display = screen.getPrimaryDisplay();
+	const { width, height } = display.workAreaSize;
+	const windowWidth = Math.min(640, width * 0.8);
+	const windowHeight = Math.min(480, height * 0.8);
+
+	cameraWindow = new BrowserWindow({
+		width: windowWidth,
+		height: windowHeight,
+		title: 'Camera Visualization',
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
+	});
+
+	cameraWindow.loadFile(path.join(process.env.APP_ROOT, 'electron', 'camera.html'));
+	
+	// Wait for window to be ready before sending video stream
+	cameraWindow.webContents.on('did-finish-load', () => {
+		// Request video stream from Python process
+		if (pythonProcess && pythonProcess.stdin) {
+			pythonProcess.stdin.write(JSON.stringify({ 
+				request_video: true 
+			}) + '\n');
+		}
+	});
+	
+	cameraWindow.on('closed', () => {
+		cameraWindow = null;
+		notifyCameraWindowClosed();
+	});
+}
+
 function startPythonBlinkDetector() {
 	if (isPythonRunning) return;
 
@@ -412,6 +452,16 @@ function startPythonBlinkDetector() {
 							frame_skip: FRAME_SKIP // Send frame skip setting to Python
 						}) + '\n');
 					}
+				} else if (parsed.faceData) {
+					// Send face tracking data to camera window
+					if (cameraWindow && !cameraWindow.isDestroyed()) {
+						cameraWindow.webContents.send('face-tracking-data', parsed.faceData);
+					}
+				} else if (parsed.videoStream) {
+					// Handle video stream data
+					if (cameraWindow && !cameraWindow.isDestroyed()) {
+						cameraWindow.webContents.send('video-stream', parsed.videoStream);
+					}
 				}
 			} catch (error) {
 				console.error('Failed to parse Python output:', error);
@@ -438,6 +488,11 @@ function stopPythonBlinkDetector() {
 		pythonProcess = null;
 	}
 	isPythonRunning = false;
+	
+	if (cameraWindow) {
+		cameraWindow.close();
+		cameraWindow = null;
+	}
 }
 
 function startCameraMonitoring() {
@@ -822,5 +877,24 @@ app.whenReady().then(() => {
 	// Start exercise monitoring if enabled
 	if (preferences.eyeExercisesEnabled) {
 		startExerciseMonitoring();
+	}
+});
+
+// Add IPC handler for showing camera window
+ipcMain.on('show-camera-window', () => {
+	showCameraWindow();
+});
+
+// When camera window is closed, notify renderer
+function notifyCameraWindowClosed() {
+	if (win && !win.isDestroyed()) {
+		win.webContents.send('camera-window-closed');
+	}
+}
+
+ipcMain.on('close-camera-window', () => {
+	if (cameraWindow && !cameraWindow.isDestroyed()) {
+		cameraWindow.close();
+		cameraWindow = null;
 	}
 });

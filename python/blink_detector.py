@@ -7,10 +7,14 @@ import os
 import dlib
 from pathlib import Path
 import select
+import base64
 
 # Constants
 EAR_THRESHOLD = 0.25  # Default value
 BLINK_COOLDOWN = 0.5  # seconds
+
+# Global variables
+SEND_VIDEO = False
 
 def calculate_ear(eye_points):
     # Calculate the vertical distances
@@ -22,7 +26,15 @@ def calculate_ear(eye_points):
     ear = (vertical_dist1 + vertical_dist2) / (2.0 * horizontal_dist)
     return ear
 
+def encode_frame(frame):
+    # Encode frame as JPEG
+    _, buffer = cv2.imencode('.jpg', frame)
+    # Convert to base64
+    return base64.b64encode(buffer).decode('utf-8')
+
 def main():
+    global SEND_VIDEO
+    
     print(json.dumps({"status": "Starting blink detector..."}))
     sys.stdout.flush()
     
@@ -55,6 +67,7 @@ def main():
     
     last_blink_time = time.time()
     current_ear_threshold = EAR_THRESHOLD
+    frame_count = 0
     
     try:
         while True:
@@ -68,6 +81,10 @@ def main():
                             current_ear_threshold = float(data['ear_threshold'])
                             print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
                             sys.stdout.flush()
+                        elif 'request_video' in data:
+                            SEND_VIDEO = True
+                            print(json.dumps({"status": "Video streaming enabled"}))
+                            sys.stdout.flush()
                 except json.JSONDecodeError:
                     pass
                 except Exception as e:
@@ -79,11 +96,19 @@ def main():
                 print(json.dumps({"error": "Failed to read frame"}))
                 break
             
-            # Convert to grayscale
+            # Convert to grayscale for face detection
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
             # Detect faces using dlib
             faces = detector(gray, 0)
+            
+            face_data = {
+                "faceDetected": False,
+                "ear": 0.0,
+                "blink": False,
+                "faceRect": {"x": 0, "y": 0, "width": 0, "height": 0},
+                "eyeLandmarks": []
+            }
             
             for face in faces:
                 # Get facial landmarks
@@ -103,15 +128,42 @@ def main():
                 
                 current_time = time.time()
                 
+                # Update face data
+                face_data["faceDetected"] = True
+                face_data["ear"] = avg_ear
+                face_data["faceRect"] = {
+                    "x": face.left() / frame.shape[1],
+                    "y": face.top() / frame.shape[0],
+                    "width": face.width() / frame.shape[1],
+                    "height": face.height() / frame.shape[0]
+                }
+                face_data["eyeLandmarks"] = [
+                    {"x": p[0] / frame.shape[1], "y": p[1] / frame.shape[0]}
+                    for p in np.concatenate([left_eye, right_eye])
+                ]
+                
                 # Check for blink using current threshold
                 if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
                     last_blink_time = current_time
+                    face_data["blink"] = True
                     print(json.dumps({
                         "blink": True,
                         "ear": avg_ear,
                         "time": current_time
                     }))
                     sys.stdout.flush()
+            
+            # Send face tracking data
+            print(json.dumps({"faceData": face_data}))
+            sys.stdout.flush()
+            
+            # Send video frame every 3 frames if enabled
+            if SEND_VIDEO and frame_count % 3 == 0:
+                frame_base64 = encode_frame(frame)
+                print(json.dumps({"videoStream": frame_base64}))
+                sys.stdout.flush()
+            
+            frame_count += 1
             
             # Small delay to prevent high CPU usage
             time.sleep(0.01)

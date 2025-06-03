@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const validChannels = [
       'main-process-message', 
       'load-preferences',
-      'camera-error'
+      'camera-error',
+      'video-stream'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
@@ -33,7 +34,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-blink-sensitivity',
       'skip-exercise',
       'snooze-exercise',
-      'update-mgd-mode'
+      'update-mgd-mode',
+      'show-camera-window',
+      'close-camera-window'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

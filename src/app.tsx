@@ -62,6 +62,7 @@ export default function DryEyeHealthHomepage() {
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const [tempShortcut, setTempShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState('');
+  const [isCameraWindowOpen, setIsCameraWindowOpen] = useState(false);
 
   // Load preferences from main process
   useEffect(() => {
@@ -141,6 +142,15 @@ export default function DryEyeHealthHomepage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isRecordingShortcut, preferences.keyboardShortcut, preferences.isTracking, preferences.reminderInterval]);
+
+  useEffect(() => {
+    // Listen for camera window close event (optional: you may need to implement this in main.ts)
+    const handleCameraWindowClosed = () => setIsCameraWindowOpen(false);
+    window.ipcRenderer?.on('camera-window-closed', handleCameraWindowClosed);
+    return () => {
+      window.ipcRenderer?.off('camera-window-closed', handleCameraWindowClosed);
+    };
+  }, []);
 
   const validateShortcut = (shortcut: string): boolean => {
     if (!shortcut) return false;
@@ -263,7 +273,7 @@ export default function DryEyeHealthHomepage() {
                 {preferences.isTracking && (
                   <div className="mt-4 flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
                     <Activity className="w-4 h-4 animate-pulse" />
-                    <span className="text-sm font-medium">Tracking active</span>
+                    <span className="text-sm font-medium">Reminders active</span>
                   </div>
                 )}
               </div>
@@ -274,20 +284,55 @@ export default function DryEyeHealthHomepage() {
                   <Camera className="w-4 h-4" />
                   Camera Detection
                 </label>
-                <button
-                  onClick={() => {
-                    const newCameraEnabled = !preferences.cameraEnabled;
-                    
-                    // If reminders are active, stop them first
-                    if (preferences.isTracking) {
-                      window.ipcRenderer?.send('stop-blink-reminders');
-                      // Wait a brief moment to ensure reminders are stopped before updating camera setting
-                      setTimeout(() => {
-                        setPreferences(prev => ({ 
-                          ...prev, 
-                          isTracking: false,
-                          cameraEnabled: newCameraEnabled 
-                        }));
+                <div className="flex items-center gap-2">
+                  {preferences.isTracking && preferences.cameraEnabled && (
+                    isCameraWindowOpen ? (
+                      <button
+                        onClick={() => {
+                          window.ipcRenderer?.send('close-camera-window');
+                          setIsCameraWindowOpen(false);
+                        }}
+                        className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                      >
+                        Stop Showing
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          window.ipcRenderer?.send('show-camera-window');
+                          setIsCameraWindowOpen(true);
+                        }}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Show Camera
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() => {
+                      const newCameraEnabled = !preferences.cameraEnabled;
+                      
+                      // If reminders are active, stop them first
+                      if (preferences.isTracking) {
+                        window.ipcRenderer?.send('stop-blink-reminders');
+                        // Wait a brief moment to ensure reminders are stopped before updating camera setting
+                        setTimeout(() => {
+                          setPreferences(prev => ({ 
+                            ...prev, 
+                            isTracking: false,
+                            cameraEnabled: newCameraEnabled 
+                          }));
+                          
+                          // Send appropriate camera tracking message
+                          if (newCameraEnabled) {
+                            window.ipcRenderer?.send('start-camera-tracking');
+                          } else {
+                            window.ipcRenderer?.send('stop-camera-tracking');
+                          }
+                        }, 100);
+                      } else {
+                        // If reminders are not active, just update the camera setting
+                        setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
                         
                         // Send appropriate camera tracking message
                         if (newCameraEnabled) {
@@ -295,29 +340,19 @@ export default function DryEyeHealthHomepage() {
                         } else {
                           window.ipcRenderer?.send('stop-camera-tracking');
                         }
-                      }, 100);
-                    } else {
-                      // If reminders are not active, just update the camera setting
-                      setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
-                      
-                      // Send appropriate camera tracking message
-                      if (newCameraEnabled) {
-                        window.ipcRenderer?.send('start-camera-tracking');
-                      } else {
-                        window.ipcRenderer?.send('stop-camera-tracking');
                       }
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                    preferences.cameraEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      preferences.cameraEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      preferences.cameraEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        preferences.cameraEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Blink Detection Sensitivity - Only shown when camera is enabled */}
@@ -417,12 +452,10 @@ export default function DryEyeHealthHomepage() {
               {/* Camera Description */}
               {preferences.cameraEnabled && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-200">
-                  <p className="mb-2">Camera eye tracking is enabled. The camera will only activate when you start reminders. Toggling this will pause the reminders.</p>
+                  <p className="mb-2">Camera eye tracking is enabled.</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>The camera will detect when you blink and then close reminders</li>
-                    <li>Reminders will only show if you haven't blinked within your set interval</li>
-                    <li>Works best in well-lit environments</li>
-                    <li>No video is recorded or stored</li>
+                    <li>The camera will detect when you blink and then close reminder popups</li>
+                    <li>Reminders will only show if you haven't blinked within your set interval (Unless MGD mode is enabled)</li>
                   </ul>
                 </div>
               )}
