@@ -40,9 +40,7 @@ let currentPopup: BrowserWindow | null = null;
 // Camera-based blink detection state
 let lastBlinkTime = Date.now();
 let cameraMonitoringInterval: NodeJS.Timeout | null = null;
-let isCameraMonitoring = false;
 
-// Add these variables at the top with other state variables
 let pythonProcess: any = null;
 let isPythonRunning = false;
 let exerciseIntervalId: NodeJS.Timeout | null = null;
@@ -58,7 +56,6 @@ let cameraWindow: BrowserWindow | null = null;
 let positionEditorWindow: BrowserWindow | null = null;
 let positionUpdateTimeout: NodeJS.Timeout | null = null;
 
-// Load all preferences from store
 const preferences = {
 	darkMode: store.get('darkMode', false) as boolean,
 	reminderInterval: store.get('reminderInterval', 5000) as number,
@@ -112,19 +109,13 @@ function createWindow() {
 }
 
 function showBlinkPopup() {
-	// Close any existing popup
 	if (currentPopup) {
 		currentPopup.close();
 		currentPopup = null;
 	}
-
-	const display = screen.getPrimaryDisplay();
-	const { width } = display.workAreaSize;
-	const { height } = display.workAreaSize;
 	const popupWidth = 220;
 	const popupHeight = 80;
 	
-	// Use stored position
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -171,19 +162,14 @@ function showBlinkPopup() {
 }
 
 function showStoppedPopup() {
-	// Close any existing popup first
 	if (currentPopup) {
 		currentPopup.close();
 		currentPopup = null;
 	}
 
-	const display = screen.getPrimaryDisplay();
-	const { width } = display.workAreaSize;
-	const { height } = display.workAreaSize;
 	const popupWidth = 220;
 	const popupHeight = 80;
 	
-	// Use stored position
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -233,8 +219,8 @@ function showPositionEditor() {
 	}
 
 	const display = screen.getPrimaryDisplay();
-	const popupWidth = 220; // Match blink popup width
-	const popupHeight = 80; // Match blink popup height
+	const popupWidth = 220; 
+	const popupHeight = 80; 
 
 	// Start at current popup position
 	const x = preferences.popupPosition.x;
@@ -303,7 +289,6 @@ async function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
 	preferences.reminderInterval = interval;
 	
-	// Start Python process if camera is enabled
 	if (preferences.cameraEnabled) {
 		startPythonBlinkDetector();
 	}
@@ -329,16 +314,13 @@ function stopBlinkReminderLoop() {
 		cameraMonitoringInterval = null;
 	}
 	
-	// Stop Python process if it's running
 	stopPythonBlinkDetector();
 	
-	// Close any existing popup immediately
 	if (currentPopup) {
 		currentPopup.close();
 		currentPopup = null;
 	}
 	
-	// If camera was enabled, stop it
 	if (preferences.cameraEnabled) {
 		preferences.isTracking = false;
 		// Notify renderer to stop camera
@@ -347,10 +329,8 @@ function stopBlinkReminderLoop() {
 }
 
 function registerGlobalShortcut(shortcut: string) {
-	// Unregister any existing shortcut first
 	globalShortcut.unregisterAll();
 	
-	// Register the new shortcut
 	globalShortcut.register(shortcut, () => {
 		preferences.isTracking = !preferences.isTracking;
 		if (preferences.isTracking) {
@@ -375,7 +355,6 @@ function registerGlobalShortcut(shortcut: string) {
 				startBlinkReminderLoop(preferences.reminderInterval);
 			}
 		} else {
-			// Stop reminders
 			stopBlinkReminderLoop();
 			showStoppedPopup();
 		}
@@ -471,9 +450,6 @@ function startPythonBlinkDetector() {
 					if (frameCount % FRAME_SKIP !== 0) {
 						continue;
 					}
-
-					console.log('Blink detected!', parsed);
-					// Handle blink detection
 					lastBlinkTime = Date.now();
 					try {
 						if (currentPopup && !currentPopup.isDestroyed()) {
@@ -548,7 +524,6 @@ function startCameraMonitoring() {
 	lastBlinkTime = Date.now();
 	frameCount = 0;
 	
-	// Start Python process instead of using MediaPipe
 	startPythonBlinkDetector();
 	
 	if (preferences.mgdMode) {
@@ -603,18 +578,7 @@ function startCameraMonitoring() {
 	}
 }
 
-function stopCameraMonitoring() {
-	if (cameraMonitoringInterval) {
-		clearInterval(cameraMonitoringInterval);
-		cameraMonitoringInterval = null;
-	}
-	mgdReminderLoopActive = false;
-	stopPythonBlinkDetector();
-}
-
-// Camera-based blink detection IPC handlers
 ipcMain.on("blink-detected", () => {
-	// Update last blink time
 	lastBlinkTime = Date.now();
 	
 	// Only close popup in normal mode (not MGD mode)
@@ -745,7 +709,6 @@ ipcMain.on("update-blink-sensitivity", (event, sensitivity: number) => {
 	}, 500);
 });
 
-// Add this function to show the exercise popup
 function showExercisePopup() {
 	// Prevent overlapping exercises
 	if (isExerciseShowing || currentExercisePopup) {
@@ -817,7 +780,6 @@ function showExercisePopup() {
 	}, 15000);
 }
 
-// Add this function to start exercise monitoring
 function startExerciseMonitoring() {
 	if (exerciseIntervalId) {
 		clearInterval(exerciseIntervalId);
@@ -838,7 +800,6 @@ function startExerciseMonitoring() {
 	}, 60 * 1000); // Check every minute
 }
 
-// Add this function to stop exercise monitoring
 function stopExerciseMonitoring() {
 	if (exerciseIntervalId) {
 		clearInterval(exerciseIntervalId);
@@ -855,7 +816,6 @@ function stopExerciseMonitoring() {
 	isExerciseShowing = false;
 }
 
-// Add these IPC handlers
 ipcMain.on("skip-exercise", () => {
 	if (currentExercisePopup) {
 		(currentExercisePopup as BrowserWindow).close();
@@ -879,7 +839,6 @@ ipcMain.on("snooze-exercise", () => {
 	}, 5 * 60 * 1000); // Snooze for 5 minutes
 });
 
-// Add this IPC handler
 ipcMain.on("update-mgd-mode", (event, enabled: boolean) => {
 	preferences.mgdMode = enabled;
 	store.set('mgdMode', enabled);
@@ -924,7 +883,6 @@ app.whenReady().then(() => {
 	}
 });
 
-// Add IPC handler for showing camera window
 ipcMain.on('show-camera-window', () => {
 	showCameraWindow();
 });
@@ -943,7 +901,6 @@ ipcMain.on('close-camera-window', () => {
 	}
 });
 
-// Add new IPC handler for showing position editor
 ipcMain.on("show-position-editor", () => {
 	showPositionEditor();
 });

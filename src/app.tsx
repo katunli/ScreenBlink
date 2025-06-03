@@ -144,7 +144,6 @@ export default function DryEyeHealthHomepage() {
   }, [isRecordingShortcut, preferences.keyboardShortcut, preferences.isTracking, preferences.reminderInterval]);
 
   useEffect(() => {
-    // Listen for camera window close event (optional: you may need to implement this in main.ts)
     const handleCameraWindowClosed = () => setIsCameraWindowOpen(false);
     window.ipcRenderer?.on('camera-window-closed', handleCameraWindowClosed);
     return () => {
@@ -323,7 +322,6 @@ export default function DryEyeHealthHomepage() {
                             cameraEnabled: newCameraEnabled 
                           }));
                           
-                          // Send appropriate camera tracking message
                           if (newCameraEnabled) {
                             window.ipcRenderer?.send('start-camera-tracking');
                           } else {
@@ -334,7 +332,6 @@ export default function DryEyeHealthHomepage() {
                         // If reminders are not active, just update the camera setting
                         setPreferences(prev => ({ ...prev, cameraEnabled: newCameraEnabled }));
                         
-                        // Send appropriate camera tracking message
                         if (newCameraEnabled) {
                           window.ipcRenderer?.send('start-camera-tracking');
                         } else {
