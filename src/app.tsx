@@ -28,12 +28,12 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   eyeExercisesEnabled: true,
   popupPosition: 'top-right',
   popupColors: {
-    background: '#1E1E1E',
-    text: '#FFFFFF',
-    opacity: 0.5
+    background: '#FFFFFF',
+    text: '#00FF40',
+    opacity: 0.7
   },
   isTracking: false,
-  keyboardShortcut: 'Ctrl+Shift+B',
+  keyboardShortcut: 'Meta+I',
   blinkSensitivity: 0.2,
   mgdMode: false,
   showMgdInfo: false
@@ -175,6 +175,13 @@ export default function ScreenBlinkHomepage() {
       window.ipcRenderer?.send('start-blink-reminders', preferences.reminderInterval * 1000);
     } else {
       window.ipcRenderer?.send('stop-blink-reminders');
+    }
+  };
+
+  // Add reset preferences function
+  const handleResetPreferences = () => {
+    if (window.confirm('Are you sure you want to reset all preferences to default values?')) {
+      window.ipcRenderer?.send('reset-preferences');
     }
   };
 
@@ -455,7 +462,7 @@ export default function ScreenBlinkHomepage() {
                     <li>Reminders will only show if you haven't blinked within your set interval (Unless MGD mode is enabled)</li>
                   </ul>
                 </div>
-              )}
+              )}              
             </div>
 
             {/* Right Column - Feature Toggles */}
@@ -658,6 +665,15 @@ export default function ScreenBlinkHomepage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-center items-center mt-4">
+          <button
+            onClick={handleResetPreferences}
+            className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Reset Preferences
+          </button>
         </div>
 
         {/* Tips Section */}

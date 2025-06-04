@@ -39,7 +39,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'show-camera-window',
       'close-camera-window',
       'show-position-editor',
-      'position-saved'
+      'position-saved',
+      'reset-preferences'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

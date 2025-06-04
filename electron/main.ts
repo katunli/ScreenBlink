@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, globalShortcut } from "electron";
+import { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -11,6 +11,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Initialize electron-store
 const store = new Store();
+
+// Log all stored preferences on startup
+console.log('Stored preferences:', {
+	darkMode: store.get('darkMode'),
+	reminderInterval: store.get('reminderInterval'),
+	cameraEnabled: store.get('cameraEnabled'),
+	eyeExercisesEnabled: store.get('eyeExercisesEnabled'),
+	popupPosition: store.get('popupPosition'),
+	popupColors: store.get('popupColors'),
+	keyboardShortcut: store.get('keyboardShortcut'),
+	blinkSensitivity: store.get('blinkSensitivity'),
+	mgdMode: store.get('mgdMode')
+});
 
 // The built directory structure
 //
@@ -56,8 +69,12 @@ let cameraWindow: BrowserWindow | null = null;
 let positionEditorWindow: BrowserWindow | null = null;
 let positionUpdateTimeout: NodeJS.Timeout | null = null;
 
+// Store state before sleep
+let wasTrackingBeforeSleep = false;
+let wasCameraEnabledBeforeSleep = false;
+
 const preferences = {
-	darkMode: store.get('darkMode', false) as boolean,
+	darkMode: store.get('darkMode', true) as boolean,
 	reminderInterval: store.get('reminderInterval', 5000) as number,
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
@@ -72,7 +89,7 @@ const preferences = {
 		opacity: number;
 	},
 	isTracking: false,
-	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+Shift+B') as string,
+	keyboardShortcut: store.get('keyboardShortcut', 'Meta+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
 	mgdMode: store.get('mgdMode', false) as boolean
 };
@@ -524,13 +541,16 @@ function startCameraMonitoring() {
 	lastBlinkTime = Date.now();
 	frameCount = 0;
 	
-	startPythonBlinkDetector();
+	// Ensure Python process is running
+	if (!isPythonRunning) {
+		startPythonBlinkDetector();
+	}
 	
 	if (preferences.mgdMode) {
 		// In MGD mode, use the same interval-based approach as startBlinkReminderLoop
 		mgdReminderLoopActive = true;
 		async function mgdReminderLoop() {
-			while (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode) {
+			while (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isPythonRunning) {
 				await new Promise((resolve) => {
 					showBlinkPopup();
 					// Always close popup after 2.5 seconds in MGD mode
@@ -547,7 +567,7 @@ function startCameraMonitoring() {
 						resolve(null);
 					}, 2500);
 				});
-				if (!mgdReminderLoopActive || !preferences.isTracking || !preferences.mgdMode) break;
+				if (!mgdReminderLoopActive || !preferences.isTracking || !preferences.mgdMode || !isPythonRunning) break;
 				await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
 			}
 		}
@@ -556,7 +576,7 @@ function startCameraMonitoring() {
 		// Normal mode - only show popup if no blink detected
 		cameraMonitoringInterval = setInterval(() => {
 			const timeSinceLastBlink = Date.now() - lastBlinkTime;
-			if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup) {
+			if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isPythonRunning) {
 				showBlinkPopup();
 				// Auto-close popup after 2.5 seconds
 				setTimeout(() => {
@@ -854,6 +874,51 @@ app.on('before-quit', () => {
 	}
 });
 
+// Add system sleep/wake handlers
+powerMonitor.on('suspend', () => {
+	// Store current state before sleep
+	wasTrackingBeforeSleep = preferences.isTracking;
+	wasCameraEnabledBeforeSleep = preferences.cameraEnabled;
+	
+	// Stop Python process and camera monitoring
+	stopPythonBlinkDetector();
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	
+	// Stop MGD reminder loop if active
+	if (mgdReminderLoopActive) {
+		mgdReminderLoopActive = false;
+	}
+});
+
+powerMonitor.on('resume', () => {
+	// If reminders were active and camera was enabled before sleep, restart them
+	if (wasTrackingBeforeSleep && wasCameraEnabledBeforeSleep) {
+		// Reset last blink time and start camera monitoring
+		lastBlinkTime = Date.now();
+		
+		// Start Python process first
+		startPythonBlinkDetector();
+		
+		// Wait a brief moment to ensure Python process is ready
+		setTimeout(() => {
+			if (isPythonRunning) {
+				// Only start camera monitoring if Python process is running
+				startCameraMonitoring();
+			} else {
+				// If Python process failed to start, stop tracking
+				preferences.isTracking = false;
+				win?.webContents.send('load-preferences', {
+					...preferences,
+					reminderInterval: preferences.reminderInterval / 1000
+				});
+			}
+		}, 1000);
+	}
+});
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -903,4 +968,55 @@ ipcMain.on('close-camera-window', () => {
 
 ipcMain.on("show-position-editor", () => {
 	showPositionEditor();
+});
+
+// Add function to reset preferences to defaults
+function resetPreferencesToDefaults() {
+	// Stop any active reminders first
+	if (preferences.isTracking) {
+		stopBlinkReminderLoop();
+		showStoppedPopup();
+	}
+
+	store.clear(); // Clear all stored preferences
+	store.set('darkMode', true);
+	store.set('reminderInterval', 5000);
+	store.set('cameraEnabled', false);
+	store.set('eyeExercisesEnabled', true);
+	store.set('popupPosition', { x: 40, y: 40 });
+	store.set('popupColors', {
+		background: '#FFFFFF',
+		text: '#00FF11',
+		opacity: 0.7
+	});
+	store.set('keyboardShortcut', 'Meta+I');
+	store.set('blinkSensitivity', 0.20);
+	store.set('mgdMode', false);
+	
+	// Update current preferences
+	preferences.darkMode = true;
+	preferences.reminderInterval = 5000;
+	preferences.cameraEnabled = false;
+	preferences.eyeExercisesEnabled = true;
+	preferences.popupPosition = { x: 40, y: 40 };
+	preferences.popupColors = {
+		background: '#FFFFFF',
+		text: '#00FF11',
+		opacity: 0.7
+	};
+	preferences.keyboardShortcut = 'Meta+I';
+	preferences.blinkSensitivity = 0.20;
+	preferences.mgdMode = false;
+	preferences.isTracking = false; // Ensure tracking is stopped
+	
+	// Notify renderer of updated preferences
+	win?.webContents.send('load-preferences', {
+		...preferences,
+		reminderInterval: preferences.reminderInterval / 1000
+	});
+}
+
+// Add IPC handler for resetting preferences
+ipcMain.on('reset-preferences', () => {
+	resetPreferencesToDefaults();
 });
