@@ -34,14 +34,13 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   },
   isTracking: false,
   keyboardShortcut: 'Meta+I',
-  blinkSensitivity: 0.2,
+  blinkSensitivity: 0.22,
   mgdMode: false,
   showMgdInfo: false
 };
 
 export default function ScreenBlinkHomepage() {
   useEffect(() => {
-    // Add the animation style
     const style = document.createElement('style');
     style.textContent = `
       @keyframes fadeOut {
@@ -76,14 +75,12 @@ export default function ScreenBlinkHomepage() {
 
   // Update main process whenever preferences change
   useEffect(() => {
-    // Apply dark mode
     if (preferences.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
 
-    // Send all preference updates to main process
     window.ipcRenderer?.send('update-dark-mode', preferences.darkMode);
     window.ipcRenderer?.send('update-camera-enabled', preferences.cameraEnabled);
     window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
@@ -92,7 +89,6 @@ export default function ScreenBlinkHomepage() {
     window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
   }, [preferences]);
 
-  // Add keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isRecordingShortcut) {
@@ -129,7 +125,6 @@ export default function ScreenBlinkHomepage() {
           // First update the state
           setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
           
-          // Then send the appropriate IPC message
           if (preferences.isTracking) {
             window.ipcRenderer?.send('stop-blink-reminders');
           } else {
