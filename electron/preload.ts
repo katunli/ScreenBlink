@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'camera-window-closed'
     ];
     if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, (event, ...args) => func(...args));
+      ipcRenderer.on(channel, (_event, ...args) => func(...args));
     }
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {

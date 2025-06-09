@@ -222,7 +222,6 @@ function showPositionEditor() {
 		return;
 	}
 
-	const display = screen.getPrimaryDisplay();
 	const popupWidth = 220; 
 	const popupHeight = 80; 
 
@@ -602,7 +601,7 @@ ipcMain.on("blink-detected", () => {
 	}
 });
 
-ipcMain.on("start-blink-reminders", (event, interval: number) => {
+ipcMain.on("start-blink-reminders", (_event, interval: number) => {
 	stopBlinkReminderLoop(); // Stop any existing processes first
 	
 	// Close any existing popup when starting/restarting
@@ -627,27 +626,27 @@ ipcMain.on("stop-blink-reminders", () => {
 	showStoppedPopup();
 });
 
-ipcMain.on("update-popup-position", (event, position: { x: number, y: number }) => {
+ipcMain.on("update-popup-position", (_event, position: { x: number, y: number }) => {
 	preferences.popupPosition = position;
 	store.set('popupPosition', position);
 });
 
-ipcMain.on("update-interval", (event, interval: number) => {
+ipcMain.on("update-interval", (_event, interval: number) => {
 	preferences.reminderInterval = interval;
 	store.set('reminderInterval', interval);
 });
 
-ipcMain.on("update-popup-colors", (event, colors) => {
+ipcMain.on("update-popup-colors", (_event, colors) => {
 	preferences.popupColors = colors;
 	store.set('popupColors', colors);
 });
 
-ipcMain.on("update-dark-mode", (event, darkMode: boolean) => {
+ipcMain.on("update-dark-mode", (_event, darkMode: boolean) => {
 	preferences.darkMode = darkMode;
 	store.set('darkMode', darkMode);
 });
 
-ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
+ipcMain.on("update-camera-enabled", (_event, enabled: boolean) => {
 	preferences.cameraEnabled = enabled;
 	store.set('cameraEnabled', enabled);
 	
@@ -657,7 +656,7 @@ ipcMain.on("update-camera-enabled", (event, enabled: boolean) => {
 	}
 });
 
-ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
+ipcMain.on("update-eye-exercises-enabled", (_event, enabled: boolean) => {
 	preferences.eyeExercisesEnabled = enabled;
 	store.set('eyeExercisesEnabled', enabled);
 	
@@ -668,7 +667,7 @@ ipcMain.on("update-eye-exercises-enabled", (event, enabled: boolean) => {
 	}
 });
 
-ipcMain.on("update-keyboard-shortcut", (event, shortcut: string) => {
+ipcMain.on("update-keyboard-shortcut", (_event, shortcut: string) => {
 	preferences.keyboardShortcut = shortcut;
 	store.set('keyboardShortcut', shortcut);
 	registerGlobalShortcut(shortcut);
@@ -698,7 +697,7 @@ ipcMain.on("stop-camera-tracking", () => {
 	store.set('cameraEnabled', false);
 });
 
-ipcMain.on("update-blink-sensitivity", (event, sensitivity: number) => {
+ipcMain.on("update-blink-sensitivity", (_event, sensitivity: number) => {
 	preferences.blinkSensitivity = sensitivity;
 	store.set('blinkSensitivity', sensitivity);
 	
@@ -846,7 +845,7 @@ ipcMain.on("snooze-exercise", () => {
 	}, 5 * 60 * 1000); // Snooze for 5 minutes
 });
 
-ipcMain.on("update-mgd-mode", (event, enabled: boolean) => {
+ipcMain.on("update-mgd-mode", (_event, enabled: boolean) => {
 	preferences.mgdMode = enabled;
 	store.set('mgdMode', enabled);
 });

@@ -108,7 +108,6 @@ export default function ScreenBlinkHomepage() {
           setTempShortcut(keys.join('+'));
         }
       } else if (preferences.keyboardShortcut) {
-        const shortcutKeys = preferences.keyboardShortcut.split('+');
         const pressedKeys = [];
         
         if (e.ctrlKey) pressedKeys.push('Ctrl');

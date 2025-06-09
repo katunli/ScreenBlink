@@ -51,6 +51,7 @@
 		"productName": "ScreenBlink",
 		"files": [
 			"dist/**/*",
+			"dist-electron/**/*",
 			"python/**/*",
 			"electron/assets/models/**/*"
 		],
@@ -59,13 +60,15 @@
 				"dmg",
 				"zip"
 			],
-			"category": "public.app-category.utilities"
+			"category": "public.app-category.utilities",
+			"icon": "build/icon.icns"
 		},
 		"win": {
 			"target": [
 				"nsis",
 				"zip"
-			]
+			],
+			"icon": "build/icon.ico"
 		},
 		"linux": {
 			"target": [
@@ -74,7 +77,8 @@
 				"rpm",
 				"tar.gz"
 			],
-			"category": "Utility"
+			"category": "Utility",
+			"icon": "build/icon.png"
 		}
 	}
 }
