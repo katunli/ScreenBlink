@@ -12,19 +12,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
 const store = new Store();
 
-// Log all stored preferences on startup
-console.log('Stored preferences:', {
-	darkMode: store.get('darkMode'),
-	reminderInterval: store.get('reminderInterval'),
-	cameraEnabled: store.get('cameraEnabled'),
-	eyeExercisesEnabled: store.get('eyeExercisesEnabled'),
-	popupPosition: store.get('popupPosition'),
-	popupColors: store.get('popupColors'),
-	keyboardShortcut: store.get('keyboardShortcut'),
-	blinkSensitivity: store.get('blinkSensitivity'),
-	mgdMode: store.get('mgdMode')
-});
-
 // The built directory structure
 //
 // ├─┬─┬ dist
