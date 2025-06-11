@@ -28,6 +28,16 @@ export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
+const isProd = app.isPackaged;
+
+const unpackedPythonPath = isProd
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'venv', 'bin', 'python')
+    : path.join(process.env.APP_ROOT, 'python', 'venv', 'bin', 'python');
+
+const pythonScriptPath = isProd
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'blink_detector.py')
+    : path.join(process.env.APP_ROOT, 'python', 'blink_detector.py');
+
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 	? path.join(process.env.APP_ROOT, "public")
 	: RENDERER_DIST;
@@ -144,7 +154,7 @@ function showBlinkPopup() {
 	});
 
 	currentPopup = popup;
-	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "blink.html"));
+	popup.loadFile(path.join(process.env.VITE_PUBLIC, "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
 		popup.webContents.send('camera-mode', preferences.cameraEnabled);
@@ -198,7 +208,7 @@ function showStoppedPopup() {
 	});
 
 	currentPopup = popup;
-	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "stopped.html"));
+	popup.loadFile(path.join(process.env.VITE_PUBLIC, "stopped.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
 		popup.setIgnoreMouseEvents(true);
@@ -249,7 +259,7 @@ function showPositionEditor() {
 		},
 	});
 
-	positionEditorWindow.loadFile(path.join(process.env.APP_ROOT, "electron", "position-editor.html"));
+	positionEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "position-editor.html"));
 	
 	positionEditorWindow.webContents.on('did-finish-load', () => {
 		positionEditorWindow?.webContents.send('update-colors', preferences.popupColors);
@@ -390,7 +400,7 @@ function showCameraWindow() {
 		},
 	});
 
-	cameraWindow.loadFile(path.join(process.env.APP_ROOT, 'electron', 'camera.html'));
+	cameraWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'camera.html'));
 	
 	// Wait for window to be ready before sending video stream
 	cameraWindow.webContents.on('did-finish-load', () => {
@@ -416,14 +426,13 @@ function showCameraWindow() {
 
 function startPythonBlinkDetector() {
 	if (isPythonRunning) return;
-
-	const pythonPath = path.join(process.env.APP_ROOT, 'python', 'blink_detector.py');
-	const venvPythonPath = path.join(process.env.APP_ROOT, 'python', 'venv', 'bin', 'python');
 	
 	// Use the virtual environment Python if it exists, otherwise fall back to system Python
 	const pythonExecutable = process.platform === 'win32' 
-		? path.join(process.env.APP_ROOT, 'python', 'venv', 'Scripts', 'python.exe')
-		: venvPythonPath;
+    ? (isProd
+        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'venv', 'Scripts', 'python.exe')
+        : path.join(process.env.APP_ROOT, 'python', 'venv', 'Scripts', 'python.exe'))
+    : unpackedPythonPath;
 
 	// Check if virtual environment exists
 	if (!existsSync(pythonExecutable)) {
@@ -432,7 +441,7 @@ function startPythonBlinkDetector() {
 	}
 
 	console.log('Starting Python process with:', pythonExecutable);
-	pythonProcess = spawn(pythonExecutable, [pythonPath], {
+	pythonProcess = spawn(pythonExecutable, [pythonScriptPath], {
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
 
@@ -758,7 +767,7 @@ function showExercisePopup() {
 	});
 
 	currentExercisePopup = popup;
-	popup.loadFile(path.join(process.env.APP_ROOT, "electron", "exercise.html"));
+	popup.loadFile(path.join(process.env.VITE_PUBLIC, "exercise.html"));
 	
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', { darkMode: preferences.darkMode });

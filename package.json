@@ -55,6 +55,10 @@
 			"python/**/*",
 			"electron/assets/models/**/*"
 		],
+		"asarUnpack": [
+			"python/**/*",
+			"electron/assets/models/**/*"
+		],
 		"mac": {
 			"target": [
 				"dmg",
