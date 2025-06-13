@@ -13,6 +13,7 @@ interface UserPreferences {
   cameraEnabled: boolean;
   eyeExercisesEnabled: boolean;
   popupPosition: string;
+  popupSize: { width: number; height: number };
   popupColors: PopupColors;
   isTracking: boolean;
   keyboardShortcut: string;
@@ -27,6 +28,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   cameraEnabled: false,
   eyeExercisesEnabled: true,
   popupPosition: 'top-right',
+  popupSize: { width: 220, height: 80 },
   popupColors: {
     background: '#FFFFFF',
     text: '#00FF40',
@@ -65,12 +67,19 @@ export default function ScreenBlinkHomepage() {
 
   // Load preferences from main process
   useEffect(() => {
-    window.ipcRenderer?.on('load-preferences', (savedPreferences) => {
+    const handlePreferences = (savedPreferences: any) => {
       setPreferences(prev => ({
         ...prev,
         ...savedPreferences
       }));
-    });
+    };
+
+    window.ipcRenderer?.on('load-preferences', handlePreferences);
+    
+    // Cleanup
+    return () => {
+      window.ipcRenderer?.off('load-preferences', handlePreferences);
+    };
   }, []);
 
   // Update main process whenever preferences change
@@ -461,7 +470,7 @@ export default function ScreenBlinkHomepage() {
 
             {/* Right Column - Feature Toggles */}
             <div className="space-y-6">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Features</h2>
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">Preferences</h2>
               
               {/* Eye Exercises Toggle */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
@@ -512,6 +521,28 @@ export default function ScreenBlinkHomepage() {
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
                   Click to drag and position the reminder popup anywhere on your screen
+                </p>
+              </div>
+
+              {/* Popup Size Settings */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Size</span>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <button
+                    onClick={() => window.ipcRenderer?.send('show-size-editor')}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Change Reminder Size
+                  </button>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  Current size: {preferences.popupSize.width}px × {preferences.popupSize.height}px
                 </p>
               </div>
 

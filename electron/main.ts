@@ -65,6 +65,7 @@ let cameraWindow: BrowserWindow | null = null;
 
 let positionEditorWindow: BrowserWindow | null = null;
 let positionUpdateTimeout: NodeJS.Timeout | null = null;
+let sizeEditorWindow: BrowserWindow | null = null;
 
 // Store state before sleep
 let wasTrackingBeforeSleep = false;
@@ -76,6 +77,7 @@ const preferences = {
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
 	popupPosition: store.get('popupPosition', { x: 40, y: 40 }) as { x: number, y: number },
+	popupSize: store.get('popupSize', { width: 220, height: 80 }) as { width: number, height: number },
 	popupColors: store.get('popupColors', {
 		background: '#FFFFFF',
 		text: '#00FF11',
@@ -127,15 +129,14 @@ function showBlinkPopup() {
 		currentPopup.close();
 		currentPopup = null;
 	}
-	const popupWidth = 220;
-	const popupHeight = 80;
 	
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
+
 	const popup = new BrowserWindow({
-		width: popupWidth,
-		height: popupHeight,
+		width: preferences.popupSize.width,
+		height: preferences.popupSize.height,
 		x,
 		y,
 		frame: false,
@@ -181,15 +182,12 @@ function showStoppedPopup() {
 		currentPopup = null;
 	}
 
-	const popupWidth = 220;
-	const popupHeight = 80;
-	
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
 	const popup = new BrowserWindow({
-		width: popupWidth,
-		height: popupHeight,
+		width: preferences.popupSize.width,
+		height: preferences.popupSize.height,
 		x,
 		y,
 		frame: false,
@@ -232,16 +230,13 @@ function showPositionEditor() {
 		return;
 	}
 
-	const popupWidth = 220; 
-	const popupHeight = 80; 
-
 	// Start at current popup position
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
 	positionEditorWindow = new BrowserWindow({
-		width: popupWidth,
-		height: popupHeight,
+		width: preferences.popupSize.width,
+		height: preferences.popupSize.height,
 		x,
 		y,
 		frame: false,
@@ -298,6 +293,55 @@ function showPositionEditor() {
 	});
 }
 
+function showSizeEditor() {
+	if (sizeEditorWindow) {
+		sizeEditorWindow.focus();
+		return;
+	}
+
+	// Start at current popup size and position
+	const width = preferences.popupSize.width;
+	const height = preferences.popupSize.height;
+	const x = preferences.popupPosition.x;
+	const y = preferences.popupPosition.y;
+
+	sizeEditorWindow = new BrowserWindow({
+		width: width,
+		height: height,
+		x,
+		y,
+		minWidth: 200,
+		minHeight: 80,
+		resizable: true,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		skipTaskbar: true,
+		focusable: true,
+		show: false,
+		hasShadow: false,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
+	});
+
+	sizeEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "size-editor.html"));
+	
+	sizeEditorWindow.webContents.on('did-finish-load', () => {
+		sizeEditorWindow?.webContents.send('update-colors', preferences.popupColors);
+		sizeEditorWindow?.webContents.send('current-size', preferences.popupSize);
+	});
+	
+	sizeEditorWindow.once("ready-to-show", () => {
+		sizeEditorWindow?.show();
+	});
+
+	sizeEditorWindow.on('closed', () => {
+		sizeEditorWindow = null;
+	});
+}
+
 function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
 	preferences.reminderInterval = interval;
@@ -349,7 +393,6 @@ function stopBlinkReminderLoop() {
 
 function registerGlobalShortcut(shortcut: string) {
 	globalShortcut.unregisterAll();
-	
 	globalShortcut.register(shortcut, () => {
 		preferences.isTracking = !preferences.isTracking;
 		if (preferences.isTracking) {
@@ -357,15 +400,12 @@ function registerGlobalShortcut(shortcut: string) {
 			blinkReminderActive = false;
 			if (blinkIntervalId) clearInterval(blinkIntervalId);
 			if (cameraMonitoringInterval) clearInterval(cameraMonitoringInterval);
-			
 			// Close any existing popup when starting/restarting
 			if (currentPopup) {
 				currentPopup.close();
 				currentPopup = null;
 			}
-			
 			preferences.isTracking = true;
-			
 			if (preferences.cameraEnabled) {
 				// Reset last blink time and start camera monitoring
 				lastBlinkTime = Date.now();
@@ -446,7 +486,6 @@ function startPythonBlinkDetector() {
 		return;
 	}
 
-	console.log('Starting Python process with:', pythonExecutable);
 	pythonProcess = spawn(pythonExecutable, [pythonScriptPath], {
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
@@ -610,15 +649,12 @@ ipcMain.on("blink-detected", () => {
 
 ipcMain.on("start-blink-reminders", (_event, interval: number) => {
 	stopBlinkReminderLoop(); // Stop any existing processes first
-	
 	// Close any existing popup when starting/restarting
 	if (currentPopup) {
 		currentPopup.close();
 		currentPopup = null;
 	}
-	
 	preferences.isTracking = true;
-	
 	if (preferences.cameraEnabled) {
 		// Reset last blink time and start camera monitoring
 		lastBlinkTime = Date.now();
@@ -630,6 +666,7 @@ ipcMain.on("start-blink-reminders", (_event, interval: number) => {
 
 ipcMain.on("stop-blink-reminders", () => {
 	stopBlinkReminderLoop();
+	preferences.isTracking = false;
 	showStoppedPopup();
 });
 
@@ -977,6 +1014,7 @@ function resetPreferencesToDefaults() {
 	store.set('cameraEnabled', false);
 	store.set('eyeExercisesEnabled', true);
 	store.set('popupPosition', { x: 40, y: 40 });
+	store.set('popupSize', { width: 220, height: 80 });
 	store.set('popupColors', {
 		background: '#FFFFFF',
 		text: '#00FF11',
@@ -992,6 +1030,7 @@ function resetPreferencesToDefaults() {
 	preferences.cameraEnabled = false;
 	preferences.eyeExercisesEnabled = true;
 	preferences.popupPosition = { x: 40, y: 40 };
+	preferences.popupSize = { width: 220, height: 80 };
 	preferences.popupColors = {
 		background: '#FFFFFF',
 		text: '#00FF11',
@@ -1012,4 +1051,31 @@ function resetPreferencesToDefaults() {
 // Add IPC handler for resetting preferences
 ipcMain.on('reset-preferences', () => {
 	resetPreferencesToDefaults();
+});
+
+// Add IPC handler for size editor
+ipcMain.on("show-size-editor", () => {
+	showSizeEditor();
+});
+
+// Update the size-saved handler to ensure size is properly saved and applied
+ipcMain.on("size-saved", (_event, size: { width: number, height: number }) => {
+	preferences.popupSize = size;
+	store.set('popupSize', size);
+	
+	// If there's an active popup, update its size
+	if (currentPopup && !currentPopup.isDestroyed()) {
+		currentPopup.setSize(size.width, size.height);
+	}
+
+	// If position editor is open, update its size
+	if (positionEditorWindow && !positionEditorWindow.isDestroyed()) {
+		positionEditorWindow.setSize(size.width, size.height);
+	}
+
+	// Notify renderer of updated preferences
+	win?.webContents.send('load-preferences', {
+		...preferences,
+		reminderInterval: preferences.reminderInterval / 1000
+	});
 });

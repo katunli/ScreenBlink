@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Size Editor</title>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.3);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+    }
+    .title {
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 2px;
+      -webkit-app-region: drag;
+    }
+    .instructions {
+      font-size: 0.7rem;
+      text-align: center;
+      margin-bottom: 4px;
+      -webkit-app-region: drag;
+    }
+    .size-display {
+      font-size: 0.8rem;
+      text-align: center;
+      margin-bottom: 4px;
+      -webkit-app-region: drag;
+    }
+    .buttons {
+      display: flex;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+    button {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 60px;
+    }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(1px);
+    }
+    .save {
+      background: #3B82F6;
+      color: white;
+    }
+    .cancel {
+      background: #EF4444;
+      color: white;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body {
+        background: rgba(0, 0, 0, 0.5);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title">Change Size</div>
+    <div class="instructions">Resize this window to set popup size</div>
+    <div class="size-display" id="sizeDisplay">Width: 220px, Height: 80px</div>
+    <div class="buttons">
+      <button class="save" id="saveBtn">Save</button>
+      <button class="cancel" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    function updateColors(colors) {
+      const alpha = Math.round(colors.opacity * 255).toString(16).padStart(2, '0');
+      document.body.style.background = `${colors.background}${alpha}`;
+      document.querySelector('.title').style.color = colors.text;
+      document.querySelector('.instructions').style.color = colors.text;
+      document.querySelector('.size-display').style.color = colors.text;
+    }
+
+    // Set initial colors
+    updateColors({
+      background: '#1E1E1E',
+      text: '#FFFFFF',
+      opacity: 0.5
+    });
+    
+    // Listen for color updates
+    ipcRenderer.on('update-colors', (event, colors) => {
+      updateColors(colors);
+    });
+
+    // Update size display
+    function updateSizeDisplay() {
+      const width = Math.round(window.innerWidth);
+      const height = Math.round(window.innerHeight);
+      document.getElementById('sizeDisplay').textContent = `Width: ${width}px, Height: ${height}px`;
+    }
+
+    // Listen for window resize
+    window.addEventListener('resize', updateSizeDisplay);
+
+    // Handle save button
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const size = {
+        width: Math.round(window.innerWidth),
+        height: Math.round(window.innerHeight)
+      };
+      ipcRenderer.send('size-saved', size);
+      window.close();
+    });
+
+    // Handle cancel button
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      window.close();
+    });
+
+    // Listen for initial size
+    ipcRenderer.on('current-size', (event, size) => {
+      // The window size will be set by the main process
+      updateSizeDisplay();
+    });
+
+    // Initial size display
+    updateSizeDisplay();
+  </script>
+</body>
+</html> 
