@@ -63,10 +63,6 @@ const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
 
-let positionEditorWindow: BrowserWindow | null = null;
-let positionUpdateTimeout: NodeJS.Timeout | null = null;
-let sizeEditorWindow: BrowserWindow | null = null;
-
 // Store state before sleep
 let wasTrackingBeforeSleep = false;
 let wasCameraEnabledBeforeSleep = false;
