@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Size Editor</title>
+  <title>Popup Editor</title>
   <style>
     html, body {
       width: 100%;
@@ -17,6 +17,7 @@
       overflow: hidden;
       background: rgba(255, 255, 255, 0.3);
       font-family: system-ui, -apple-system, sans-serif;
+      -webkit-app-region: drag; /* Make the entire window draggable */
     }
     .container {
       width: 100%;
@@ -85,8 +86,8 @@
 </head>
 <body>
   <div class="container">
-    <div class="title">Change Size</div>
-    <div class="instructions">Resize this window to set popup size</div>
+    <div class="title">Edit Popup</div>
+    <div class="instructions">Drag to position and resize window</div>
     <div class="size-display" id="sizeDisplay">Width: 220px, Height: 80px</div>
     <div class="buttons">
       <button class="save" id="saveBtn">Save</button>
@@ -132,7 +133,11 @@
         width: Math.round(window.innerWidth),
         height: Math.round(window.innerHeight)
       };
-      ipcRenderer.send('size-saved', size);
+      const position = {
+        x: Math.round(window.screenX),
+        y: Math.round(window.screenY)
+      };
+      ipcRenderer.send('popup-editor-saved', { size, position });
       window.close();
     });
 
@@ -141,9 +146,9 @@
       window.close();
     });
 
-    // Listen for initial size
-    ipcRenderer.on('current-size', (event, size) => {
-      // The window size will be set by the main process
+    // Listen for initial size and position
+    ipcRenderer.on('current-popup-state', (event, state) => {
+      // The window size and position will be set by the main process
       updateSizeDisplay();
     });
 

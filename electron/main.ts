@@ -71,6 +71,8 @@ let sizeEditorWindow: BrowserWindow | null = null;
 let wasTrackingBeforeSleep = false;
 let wasCameraEnabledBeforeSleep = false;
 
+let popupEditorWindow: BrowserWindow | null = null;
+
 const preferences = {
 	darkMode: store.get('darkMode', true) as boolean,
 	reminderInterval: store.get('reminderInterval', 5000) as number,
@@ -996,81 +998,75 @@ ipcMain.on('close-camera-window', () => {
 	}
 });
 
-ipcMain.on("show-position-editor", () => {
-	showPositionEditor();
-});
-
-// Add function to reset preferences to defaults
-function resetPreferencesToDefaults() {
-	// Stop any active reminders first
-	if (preferences.isTracking) {
-		stopBlinkReminderLoop();
-		showStoppedPopup();
+function showPopupEditor() {
+	if (popupEditorWindow) {
+		popupEditorWindow.focus();
+		return;
 	}
 
-	store.clear(); // Clear all stored preferences
-	store.set('darkMode', true);
-	store.set('reminderInterval', 5000);
-	store.set('cameraEnabled', false);
-	store.set('eyeExercisesEnabled', true);
-	store.set('popupPosition', { x: 40, y: 40 });
-	store.set('popupSize', { width: 220, height: 80 });
-	store.set('popupColors', {
-		background: '#FFFFFF',
-		text: '#00FF11',
-		opacity: 0.7
+	// Start at current popup size and position
+	const width = preferences.popupSize.width;
+	const height = preferences.popupSize.height;
+	const x = preferences.popupPosition.x;
+	const y = preferences.popupPosition.y;
+
+	popupEditorWindow = new BrowserWindow({
+		width: width,
+		height: height,
+		x,
+		y,
+		minWidth: 200,
+		minHeight: 80,
+		resizable: true,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		skipTaskbar: true,
+		focusable: true,
+		show: false,
+		hasShadow: false,
+		movable: true,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
 	});
-	store.set('keyboardShortcut', 'Meta+I');
-	store.set('blinkSensitivity', 0.20);
-	store.set('mgdMode', false);
+
+	popupEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "popup-editor.html"));
 	
-	// Update current preferences
-	preferences.darkMode = true;
-	preferences.reminderInterval = 5000;
-	preferences.cameraEnabled = false;
-	preferences.eyeExercisesEnabled = true;
-	preferences.popupPosition = { x: 40, y: 40 };
-	preferences.popupSize = { width: 220, height: 80 };
-	preferences.popupColors = {
-		background: '#FFFFFF',
-		text: '#00FF11',
-		opacity: 0.7
-	};
-	preferences.keyboardShortcut = 'Meta+I';
-	preferences.blinkSensitivity = 0.20;
-	preferences.mgdMode = false;
-	preferences.isTracking = false; // Ensure tracking is stopped
+	popupEditorWindow.webContents.on('did-finish-load', () => {
+		popupEditorWindow?.webContents.send('update-colors', preferences.popupColors);
+		popupEditorWindow?.webContents.send('current-popup-state', {
+			size: preferences.popupSize,
+			position: preferences.popupPosition
+		});
+	});
 	
-	// Notify renderer of updated preferences
-	win?.webContents.send('load-preferences', {
-		...preferences,
-		reminderInterval: preferences.reminderInterval / 1000
+	popupEditorWindow.once("ready-to-show", () => {
+		popupEditorWindow?.show();
+	});
+
+	popupEditorWindow.on('closed', () => {
+		popupEditorWindow = null;
 	});
 }
 
-// Add IPC handler for resetting preferences
-ipcMain.on('reset-preferences', () => {
-	resetPreferencesToDefaults();
+// Replace the show-position-editor and show-size-editor handlers with a single handler
+ipcMain.on("show-popup-editor", () => {
+	showPopupEditor();
 });
 
-// Add IPC handler for size editor
-ipcMain.on("show-size-editor", () => {
-	showSizeEditor();
-});
-
-// Update the size-saved handler to ensure size is properly saved and applied
-ipcMain.on("size-saved", (_event, size: { width: number, height: number }) => {
+// Add handler for the combined save event
+ipcMain.on("popup-editor-saved", (_event, { size, position }) => {
 	preferences.popupSize = size;
+	preferences.popupPosition = position;
 	store.set('popupSize', size);
+	store.set('popupPosition', position);
 	
-	// If there's an active popup, update its size
+	// If there's an active popup, update its size and position
 	if (currentPopup && !currentPopup.isDestroyed()) {
 		currentPopup.setSize(size.width, size.height);
-	}
-
-	// If position editor is open, update its size
-	if (positionEditorWindow && !positionEditorWindow.isDestroyed()) {
-		positionEditorWindow.setSize(size.width, size.height);
+		currentPopup.setPosition(position.x, position.y);
 	}
 
 	// Notify renderer of updated preferences

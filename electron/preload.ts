@@ -38,8 +38,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-mgd-mode',
       'show-camera-window',
       'close-camera-window',
-      'show-position-editor',
-      'position-saved',
+      'show-popup-editor',
+      'popup-editor-saved',
       'reset-preferences',
       'show-size-editor',
       'size-saved'

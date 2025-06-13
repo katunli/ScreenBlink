@@ -502,43 +502,21 @@ export default function ScreenBlinkHomepage() {
                 )}
               </div>
 
-              {/* Popup Position Settings */}
+              {/* Popup Position and Size Settings */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Position</span>
+                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Settings</span>
                   </div>
                 </div>
                 <div className="mt-2">
                   <button
-                    onClick={() => window.ipcRenderer?.send('show-position-editor')}
+                    onClick={() => window.ipcRenderer?.send('show-popup-editor')}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <Settings className="w-4 h-4" />
-                    Change Reminder Position
-                  </button>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Click to drag and position the reminder popup anywhere on your screen
-                </p>
-              </div>
-
-              {/* Popup Size Settings */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Size</span>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <button
-                    onClick={() => window.ipcRenderer?.send('show-size-editor')}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Change Reminder Size
+                    Change Position or Size
                   </button>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
