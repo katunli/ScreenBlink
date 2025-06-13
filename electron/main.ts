@@ -298,7 +298,7 @@ function showPositionEditor() {
 	});
 }
 
-async function startBlinkReminderLoop(interval: number) {
+function startBlinkReminderLoop(interval: number) {
 	blinkReminderActive = true;
 	preferences.reminderInterval = interval;
 	
@@ -306,14 +306,20 @@ async function startBlinkReminderLoop(interval: number) {
 		startPythonBlinkDetector();
 	}
 	
-	while (blinkReminderActive) {
-		await new Promise((resolve) => {
-			showBlinkPopup();
-			setTimeout(resolve, 2500); // Wait for popup to fade out
-		});
-		if (!blinkReminderActive) break;
-		await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
+	// Clear any existing interval
+	if (blinkIntervalId) {
+		clearInterval(blinkIntervalId);
 	}
+	
+	// Show initial popup
+	showBlinkPopup();
+	
+	// Set up interval for subsequent popups
+	blinkIntervalId = setInterval(() => {
+		if (blinkReminderActive) {
+			showBlinkPopup();
+		}
+	}, preferences.reminderInterval + 2500); // Add 2.5s to account for popup fade out
 }
 
 function stopBlinkReminderLoop() {
@@ -542,31 +548,23 @@ function startCameraMonitoring() {
 	}
 	
 	if (preferences.mgdMode) {
-		// In MGD mode, use the same interval-based approach as startBlinkReminderLoop
+		// In MGD mode, use interval-based approach
 		mgdReminderLoopActive = true;
-		async function mgdReminderLoop() {
-			while (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isPythonRunning) {
-				await new Promise((resolve) => {
-					showBlinkPopup();
-					// Always close popup after 2.5 seconds in MGD mode
-					setTimeout(() => {
-						try {
-							if (currentPopup && !currentPopup.isDestroyed()) {
-								currentPopup.close();
-								currentPopup = null;
-							}
-						} catch (error) {
-							console.log('Popup already destroyed');
-							currentPopup = null;
-						}
-						resolve(null);
-					}, 2500);
-				});
-				if (!mgdReminderLoopActive || !preferences.isTracking || !preferences.mgdMode || !isPythonRunning) break;
-				await new Promise((resolve) => setTimeout(resolve, preferences.reminderInterval));
-			}
+		
+		// Clear any existing interval
+		if (blinkIntervalId) {
+			clearInterval(blinkIntervalId);
 		}
-		mgdReminderLoop();
+		
+		// Show initial popup
+		showBlinkPopup();
+		
+		// Set up interval for subsequent popups
+		blinkIntervalId = setInterval(() => {
+			if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isPythonRunning) {
+				showBlinkPopup();
+			}
+		}, preferences.reminderInterval + 2500); // Add 2.5s to account for popup fade out
 	} else {
 		// Normal mode - only show popup if no blink detected
 		cameraMonitoringInterval = setInterval(() => {
