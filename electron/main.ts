@@ -86,7 +86,7 @@ const preferences = {
 		opacity: number;
 	},
 	isTracking: false,
-	keyboardShortcut: store.get('keyboardShortcut', 'Meta+I') as string,
+	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
 	mgdMode: store.get('mgdMode', false) as boolean
 };
@@ -952,4 +952,28 @@ ipcMain.on("popup-editor-saved", (_event, { size, position }) => {
 		...preferences,
 		reminderInterval: preferences.reminderInterval / 1000
 	});
+});
+
+ipcMain.on('reset-preferences', () => {
+  store.clear();
+  preferences.darkMode = true;
+  preferences.reminderInterval = 5000;
+  preferences.cameraEnabled = false;
+  preferences.eyeExercisesEnabled = true;
+  preferences.popupPosition = { x: 40, y: 40 };
+  preferences.popupSize = { width: 220, height: 80 };
+  preferences.popupColors = {
+    background: '#FFFFFF',
+    text: '#00FF11',
+    opacity: 0.7
+  };
+  preferences.isTracking = false;
+  preferences.keyboardShortcut = 'Ctrl+I';
+  preferences.blinkSensitivity = 0.20;
+  preferences.mgdMode = false;
+  registerGlobalShortcut(preferences.keyboardShortcut);
+  win?.webContents.send('load-preferences', {
+    ...preferences,
+    reminderInterval: preferences.reminderInterval / 1000
+  });
 });

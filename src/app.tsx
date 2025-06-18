@@ -35,7 +35,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     opacity: 0.7
   },
   isTracking: false,
-  keyboardShortcut: 'Meta+I',
+  keyboardShortcut: 'Ctrl+I',
   blinkSensitivity: 0.22,
   mgdMode: false,
   showMgdInfo: false
