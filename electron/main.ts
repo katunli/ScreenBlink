@@ -955,7 +955,19 @@ ipcMain.on("popup-editor-saved", (_event, { size, position }) => {
 });
 
 ipcMain.on('reset-preferences', () => {
+  // Stop any active reminders first
+  if (preferences.isTracking) {
+    stopBlinkReminderLoop();
+    showStoppedPopup();
+  }
+  
+  // Stop exercise monitoring if active
+  stopExerciseMonitoring();
+  
+  // Clear all stored preferences
   store.clear();
+  
+  // Reset preferences to defaults
   preferences.darkMode = true;
   preferences.reminderInterval = 5000;
   preferences.cameraEnabled = false;
@@ -971,7 +983,11 @@ ipcMain.on('reset-preferences', () => {
   preferences.keyboardShortcut = 'Ctrl+I';
   preferences.blinkSensitivity = 0.20;
   preferences.mgdMode = false;
+  
+  // Re-register the default keyboard shortcut
   registerGlobalShortcut(preferences.keyboardShortcut);
+  
+  // Notify renderer of updated preferences
   win?.webContents.send('load-preferences', {
     ...preferences,
     reminderInterval: preferences.reminderInterval / 1000
