@@ -154,6 +154,17 @@
 
     // Initial size display
     updateSizeDisplay();
+
+    // Add keyboard event listeners
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        document.getElementById('cancelBtn').click();
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        document.getElementById('saveBtn').click();
+      }
+    });
   </script>
 </body>
 </html> 
