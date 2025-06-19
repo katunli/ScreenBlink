@@ -48,6 +48,17 @@ For macOS builds that handle the "damaged app" issue:
 npm run build:mac
 ```
 
+This process:
+1. Builds the Electron app
+2. Removes quarantine attributes from the `.app` file
+3. Creates the DMG with the clean `.app` file
+
+For a complete clean build (including DMG cleanup):
+
+```bash
+npm run build:mac:clean
+```
+
 The built application will include all necessary files, including the facial landmark model.
 
 ## Building Windows Installers

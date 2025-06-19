@@ -10,8 +10,11 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc && vite build && electron-builder",
-		"build:mac": "tsc && vite build && electron-builder --mac && npm run remove-quarantine",
+		"build:electron": "tsc && vite build",
+		"build:mac": "npm run build:electron && node scripts/remove-quarantine.js && electron-builder --mac",
+		"build:mac:clean": "npm run build:mac && node scripts/remove-quarantine.js --clean-dmg",
 		"remove-quarantine": "node scripts/remove-quarantine.js",
+		"remove-quarantine:dmg": "node scripts/remove-quarantine.js --clean-dmg",
 		"lint": "npx @biomejs/biome check --write src",
 		"preview": "vite preview",
 		"test": "vitest",
