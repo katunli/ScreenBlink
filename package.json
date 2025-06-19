@@ -1,7 +1,7 @@
 {
 	"name": "screenblink",
 	"private": true,
-	"version": "0.0.0",
+	"version": "1.0.0",
 	"type": "module",
 	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
 	"author": {
@@ -55,13 +55,14 @@
 	"build": {
 		"appId": "com.screenblink.app",
 		"productName": "ScreenBlink",
-		"icon": "build/icon.ico",
+		"icon": "./build/icon.ico",
 		"publish": null,
 		"files": [
 			"dist/**/*",
 			"dist-electron/**/*",
 			"python/**/*",
-			"electron/assets/models/**/*"
+			"electron/assets/models/**/*",
+			"build/**/*"
 		],
 		"asarUnpack": [
 			"python/**/*",
@@ -73,14 +74,14 @@
 				"zip"
 			],
 			"category": "public.app-category.utilities",
-			"icon": "build/icon.icns"
+			"icon": "./build/icon.icns"
 		},
 		"win": {
 			"target": [
 				"nsis",
 				"zip"
 			],
-			"icon": "build/icon.ico"
+			"icon": "./build/icon.ico"
 		},
 		"linux": {
 			"target": [
@@ -90,7 +91,7 @@
 				"tar.gz"
 			],
 			"category": "Utility",
-			"icon": "build/icon.png"
+			"icon": "./build/icon.png"
 		}
 	}
 }
