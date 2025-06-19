@@ -394,7 +394,7 @@ export default function ScreenBlinkHomepage() {
                       </div>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                      Adjust how sensitive the blink detection is. Higher values make it more sensitive to blinks, while lower values will require more pronounced blinks to be detected.
+                      Set your eye size threshold for blink detection. When your eye size goes below this value, a blink will be detected. Lower values require more pronounced blinks to be detected, while higher values are more sensitive. Start reminders, then test by clicking "Show Camera" and blinking.
                     </p>
                   </div>
 
