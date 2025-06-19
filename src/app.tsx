@@ -20,6 +20,7 @@ interface UserPreferences {
   blinkSensitivity: number;
   mgdMode: boolean;
   showMgdInfo: boolean;
+  showPopupColors: boolean;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -38,7 +39,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   keyboardShortcut: 'Ctrl+I',
   blinkSensitivity: 0.22,
   mgdMode: false,
-  showMgdInfo: false
+  showMgdInfo: false,
+  showPopupColors: false
 };
 
 export default function ScreenBlinkHomepage() {
@@ -233,7 +235,7 @@ export default function ScreenBlinkHomepage() {
                   <input
                     type="range"
                     min="1"
-                    max="60"
+                    max="15"
                     value={preferences.reminderInterval}
                     onChange={(e) => {
                       const newInterval = parseInt(e.target.value);
@@ -244,7 +246,7 @@ export default function ScreenBlinkHomepage() {
                     }}
                     className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(preferences.reminderInterval - 1) / 59 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} ${(preferences.reminderInterval - 1) / 59 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
+                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(preferences.reminderInterval - 1) / 14 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} ${(preferences.reminderInterval - 1) / 14 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
                     }}
                   />
                   <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full font-semibold min-w-[80px] text-center">
@@ -502,111 +504,6 @@ export default function ScreenBlinkHomepage() {
                 )}
               </div>
 
-              {/* Popup Position and Size Settings */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Settings</span>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <button
-                    onClick={() => window.ipcRenderer?.send('show-popup-editor')}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Change Position or Size
-                  </button>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Current size: {preferences.popupSize.width}px × {preferences.popupSize.height}px
-                </p>
-              </div>
-
-              {/* Popup Color Settings */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Palette className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Colors</span>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={preferences.popupColors.background}
-                        onChange={(e) => setPreferences(prev => ({
-                          ...prev,
-                          popupColors: { ...prev.popupColors, background: e.target.value }
-                        }))}
-                        className="w-10 h-10 rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={preferences.popupColors.background}
-                        onChange={(e) => setPreferences(prev => ({
-                          ...prev,
-                          popupColors: { ...prev.popupColors, background: e.target.value }
-                        }))}
-                        className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
-                        placeholder="#000000"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Text Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={preferences.popupColors.text}
-                        onChange={(e) => setPreferences(prev => ({
-                          ...prev,
-                          popupColors: { ...prev.popupColors, text: e.target.value }
-                        }))}
-                        className="w-10 h-10 rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={preferences.popupColors.text}
-                        onChange={(e) => setPreferences(prev => ({
-                          ...prev,
-                          popupColors: { ...prev.popupColors, text: e.target.value }
-                        }))}
-                        className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
-                        placeholder="#FFFFFF"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Opacity</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={preferences.popupColors.opacity}
-                        onChange={(e) => setPreferences(prev => ({
-                          ...prev,
-                          popupColors: { ...prev.popupColors, opacity: parseFloat(e.target.value) }
-                        }))}
-                        className="flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
-                        {Math.round(preferences.popupColors.opacity * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Customize the appearance of the blink reminder popup
-                </p>
-              </div>
-
               {/* Keyboard Shortcut Settings */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-3">
@@ -665,6 +562,117 @@ export default function ScreenBlinkHomepage() {
                     Press the shortcut to start/stop reminders. Use at least one modifier key (Ctrl, Shift, Alt) and one regular key.
                   </p>
                 </div>
+              </div>
+
+              {/* Popup Position and Size Settings */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Popup Settings</span>
+                  </div>
+                  <button
+                    onClick={() => setPreferences(prev => ({ ...prev, showPopupColors: !prev.showPopupColors }))}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                  >
+                    {preferences.showPopupColors ? 'Hide' : 'Customize Appearance'}
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <button
+                    onClick={() => window.ipcRenderer?.send('show-popup-editor')}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Change Position or Size
+                  </button>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  Current size: {preferences.popupSize.width}px × {preferences.popupSize.height}px
+                </p>
+                
+                {/* Popup Color Settings - Collapsible */}
+                {preferences.showPopupColors && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Palette className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      <span className="font-medium text-gray-800 dark:text-white text-sm">Popup Colors</span>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={preferences.popupColors.background}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              popupColors: { ...prev.popupColors, background: e.target.value }
+                            }))}
+                            className="w-10 h-10 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={preferences.popupColors.background}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              popupColors: { ...prev.popupColors, background: e.target.value }
+                            }))}
+                            className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                            placeholder="#000000"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Text Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={preferences.popupColors.text}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              popupColors: { ...prev.popupColors, text: e.target.value }
+                            }))}
+                            className="w-10 h-10 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={preferences.popupColors.text}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              popupColors: { ...prev.popupColors, text: e.target.value }
+                            }))}
+                            className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                            placeholder="#FFFFFF"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Opacity</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={preferences.popupColors.opacity}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              popupColors: { ...prev.popupColors, opacity: parseFloat(e.target.value) }
+                            }))}
+                            className="flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+                            {Math.round(preferences.popupColors.opacity * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
+                      Customize the appearance of the blink reminder popup
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
