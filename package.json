@@ -3,6 +3,10 @@
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
+	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
+	"author": {
+		"name": "Katun Li"
+	},
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc && vite build && electron-builder",
@@ -51,6 +55,8 @@
 	"build": {
 		"appId": "com.screenblink.app",
 		"productName": "ScreenBlink",
+		"icon": "build/icon.ico",
+		"publish": null,
 		"files": [
 			"dist/**/*",
 			"dist-electron/**/*",
