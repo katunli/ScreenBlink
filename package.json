@@ -81,16 +81,6 @@
 				"zip"
 			],
 			"icon": "assets/icons/icon.ico"
-		},
-		"linux": {
-			"target": [
-				"AppImage",
-				"deb",
-				"rpm",
-				"tar.gz"
-			],
-			"category": "Utility",
-			"icon": "assets/icons/icon.png"
 		}
 	}
 }

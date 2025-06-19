@@ -11,14 +11,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest]
         include:
           - os: macos-latest
             platform: mac
           - os: windows-latest
             platform: win
-          - os: ubuntu-latest
-            platform: linux
 
     steps:
       - name: Checkout code
@@ -76,10 +74,6 @@ jobs:
             artifacts/mac-build/release/*.zip
             artifacts/win-build/release/*.exe
             artifacts/win-build/release/*.zip
-            artifacts/linux-build/release/*.AppImage
-            artifacts/linux-build/release/*.deb
-            artifacts/linux-build/release/*.rpm
-            artifacts/linux-build/release/*.tar.gz
           draft: false
           prerelease: false
         env:
