@@ -42,6 +42,12 @@ To build the application:
 npm run build
 ```
 
+For macOS builds that handle the "damaged app" issue:
+
+```bash
+npm run build:mac
+```
+
 The built application will include all necessary files, including the facial landmark model.
 
 ## Building Windows Installers
@@ -89,3 +95,29 @@ The application uses:
 ## License
 
 MIT
+
+## Installation
+
+### macOS
+If you encounter a "ScreenBlink.app is damaged and can't be opened" error:
+
+1. **Right-click** on the `ScreenBlink.app` file
+2. Select **"Open"** from the context menu
+3. Click **"Open"** in the security dialog that appears
+4. The app will now open normally on subsequent launches
+
+Alternatively, you can run this command in Terminal:
+```bash
+xattr -rd com.apple.quarantine /path/to/ScreenBlink.app
+```
+
+This is a common issue with unsigned macOS applications and doesn't indicate that the app is actually damaged.
+
+### Windows
+When running the installer or app for the first time, you may see a "Windows protected your PC" warning from SmartScreen. This is normal for unsigned apps.
+
+To proceed:
+1. Click **"More info"**
+2. Click **"Run anyway"**
+
+This does not mean the app is unsafe; it simply hasn't been code-signed.

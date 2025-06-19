@@ -10,6 +10,8 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc && vite build && electron-builder",
+		"build:mac": "tsc && vite build && electron-builder --mac && npm run remove-quarantine",
+		"remove-quarantine": "node scripts/remove-quarantine.js",
 		"lint": "npx @biomejs/biome check --write src",
 		"preview": "vite preview",
 		"test": "vitest",
@@ -73,7 +75,11 @@
 				"zip"
 			],
 			"category": "public.app-category.utilities",
-			"icon": "assets/icons/icon.icns"
+			"icon": "assets/icons/icon.icns",
+			"hardenedRuntime": true,
+			"gatekeeperAssess": false,
+			"entitlements": "build/entitlements.mac.plist",
+			"entitlementsInherit": "build/entitlements.mac.plist"
 		},
 		"win": {
 			"target": [
