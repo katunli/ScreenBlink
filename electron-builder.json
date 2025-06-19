@@ -1,0 +1,46 @@
+{
+  "appId": "com.screenblink.app",
+  "productName": "ScreenBlink",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "python/**/*",
+    "electron/assets/models/**/*",
+    "build/**/*"
+  ],
+  "asarUnpack": [
+    "python/**/*",
+    "electron/assets/models/**/*"
+  ],
+  "mac": {
+    "target": [
+      "dmg",
+      "zip"
+    ],
+    "category": "public.app-category.utilities",
+    "icon": "build/icon.icns",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
+  "win": {
+    "target": [
+      "nsis",
+      "zip"
+    ],
+    "icon": "build/icon.ico"
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "deb",
+      "rpm",
+      "tar.gz"
+    ],
+    "category": "Utility",
+    "icon": "build/icon.png"
+  },
+  "publish": null
+} 
