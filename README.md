@@ -44,6 +44,31 @@ npm run build
 
 The built application will include all necessary files, including the facial landmark model.
 
+## Building Windows Installers
+
+Since you're on macOS, you can use GitHub Actions to build Windows installers:
+
+### Automatic Builds
+- **Push to main/develop branches**: Triggers Windows build automatically
+- **Create a tag (v* format)**: Triggers full cross-platform build and release
+
+### Manual Builds
+1. Go to your GitHub repository
+2. Navigate to "Actions" tab
+3. Select "Build Windows Installer" workflow
+4. Click "Run workflow" button
+5. Download the artifacts from the completed run
+
+### Release Workflow
+When you create a tag (e.g., `v1.0.0`), the workflow will:
+1. Build for all platforms (macOS, Windows, Linux)
+2. Create a GitHub release
+3. Upload all installers to the release
+
+### Workflow Files
+- `.github/workflows/build-windows.yml` - Windows-only builds
+- `.github/workflows/build.yml` - Full cross-platform builds and releases
+
 ## Features
 
 - Blink detection using computer vision
