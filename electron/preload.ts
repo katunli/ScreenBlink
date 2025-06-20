@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-dark-mode',
       'update-camera-enabled',
       'update-eye-exercises-enabled',
+      'update-exercise-interval',
       'update-keyboard-shortcut',
       'blink-detected',
       'start-camera-tracking',

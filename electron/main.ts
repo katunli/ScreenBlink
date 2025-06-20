@@ -74,6 +74,7 @@ const preferences = {
 	reminderInterval: store.get('reminderInterval', 5000) as number,
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
+	exerciseInterval: store.get('exerciseInterval', 20) as number, // Exercise interval in minutes
 	popupPosition: store.get('popupPosition', { x: 40, y: 40 }) as { x: number, y: number },
 	popupSize: store.get('popupSize', { width: 220, height: 80 }) as { width: number, height: number },
 	popupColors: store.get('popupColors', {
@@ -607,6 +608,17 @@ ipcMain.on("update-eye-exercises-enabled", (_event, enabled: boolean) => {
 	}
 });
 
+ipcMain.on("update-exercise-interval", (_event, interval: number) => {
+	preferences.exerciseInterval = interval;
+	store.set('exerciseInterval', interval);
+	
+	// Restart exercise monitoring if it's currently enabled to apply the new interval
+	if (preferences.eyeExercisesEnabled) {
+		stopExerciseMonitoring();
+		startExerciseMonitoring();
+	}
+});
+
 ipcMain.on("update-keyboard-shortcut", (_event, shortcut: string) => {
 	preferences.keyboardShortcut = shortcut;
 	store.set('keyboardShortcut', shortcut);
@@ -747,7 +759,7 @@ function startExerciseMonitoring() {
 		// Show exercise every 20 minutes
 		if (preferences.eyeExercisesEnabled && 
 			!isExerciseShowing && 
-			timeSinceLastExercise >= 20 * 60 * 1000) {
+			timeSinceLastExercise >= preferences.exerciseInterval * 60 * 1000) {
 			showExercisePopup();
 			store.set('lastExerciseTime', now);
 		}
@@ -1008,6 +1020,7 @@ ipcMain.on('reset-preferences', () => {
   preferences.reminderInterval = 5000;
   preferences.cameraEnabled = false;
   preferences.eyeExercisesEnabled = true;
+  preferences.exerciseInterval = 20;
   preferences.popupPosition = { x: 40, y: 40 };
   preferences.popupSize = { width: 220, height: 80 };
   preferences.popupColors = {

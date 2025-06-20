@@ -12,6 +12,7 @@ interface UserPreferences {
   reminderInterval: number;
   cameraEnabled: boolean;
   eyeExercisesEnabled: boolean;
+  exerciseInterval: number; // Exercise interval in minutes
   popupPosition: string;
   popupSize: { width: number; height: number };
   popupColors: PopupColors;
@@ -28,6 +29,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   reminderInterval: 5,
   cameraEnabled: false,
   eyeExercisesEnabled: true,
+  exerciseInterval: 20, // Default to 20 minutes
   popupPosition: 'top-right',
   popupSize: { width: 220, height: 80 },
   popupColors: {
@@ -95,6 +97,7 @@ export default function ScreenBlinkHomepage() {
     window.ipcRenderer?.send('update-dark-mode', preferences.darkMode);
     window.ipcRenderer?.send('update-camera-enabled', preferences.cameraEnabled);
     window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
+    window.ipcRenderer?.send('update-exercise-interval', preferences.exerciseInterval);
     window.ipcRenderer?.send('update-popup-colors', preferences.popupColors);
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
     window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
@@ -494,9 +497,39 @@ export default function ScreenBlinkHomepage() {
                     />
                   </button>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  Get prompted for eye exercises every 20 minutes to help reduce eye strain
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Get prompted for eye exercises every {preferences.exerciseInterval} minute{preferences.exerciseInterval !== 1 ? 's' : ''} to help reduce eye strain
                 </p>
+                
+                {/* Exercise Interval Setting - Only show when enabled */}
+                {preferences.eyeExercisesEnabled && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Interval</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="5"
+                        max="60"
+                        value={preferences.exerciseInterval}
+                        onChange={(e) => {
+                          const newInterval = parseInt(e.target.value);
+                          setPreferences(prev => ({ ...prev, exerciseInterval: newInterval }));
+                        }}
+                        className="flex-1 h-1.5 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${(preferences.exerciseInterval - 5) / 55 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} ${(preferences.exerciseInterval - 5) / 55 * 100}%, ${preferences.darkMode ? '#1E3A8A' : '#E5E7EB'} 100%)`
+                        }}
+                      />
+                      <div className="text-xs font-medium text-blue-600 dark:text-blue-400 min-w-[40px] text-center">
+                        {preferences.exerciseInterval}m
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {preferences.eyeExercisesEnabled && (
                   <div className="mt-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
                     Exercise reminders will appear periodically
