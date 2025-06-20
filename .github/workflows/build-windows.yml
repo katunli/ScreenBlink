@@ -44,8 +44,8 @@ jobs:
       - name: List build artifacts
         run: |
           echo "Build artifacts:"
-          ls -la release/
+          dir release\
           echo "Dist folder:"
-          ls -la dist/
+          dir dist\
           echo "Dist-electron folder:"
-          ls -la dist-electron/ 
+          dir dist-electron\ 
