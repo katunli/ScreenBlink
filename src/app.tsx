@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, Palette } from 'lucide-react';
 
 interface PopupColors {
@@ -16,6 +16,7 @@ interface UserPreferences {
   popupPosition: string;
   popupSize: { width: number; height: number };
   popupColors: PopupColors;
+  popupMessage: string;
   isTracking: boolean;
   keyboardShortcut: string;
   blinkSensitivity: number;
@@ -37,6 +38,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     text: '#00FF40',
     opacity: 0.7
   },
+  popupMessage: 'Blink!',
   isTracking: false,
   keyboardShortcut: 'Ctrl+I',
   blinkSensitivity: 0.22,
@@ -68,6 +70,8 @@ export default function ScreenBlinkHomepage() {
   const [tempShortcut, setTempShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState('');
   const [isCameraWindowOpen, setIsCameraWindowOpen] = useState(false);
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
+  const [tempMessage, setTempMessage] = useState('');
 
   // Load preferences from main process
   useEffect(() => {
@@ -86,6 +90,24 @@ export default function ScreenBlinkHomepage() {
     };
   }, []);
 
+  const validateShortcut = useCallback((shortcut: string): boolean => {
+    if (!shortcut) return false;
+    const parts = shortcut.split('+');
+    if (parts.length < 2) return false;
+    return true;
+  }, []);
+
+  const handleSaveShortcut = useCallback(() => {
+    if (validateShortcut(tempShortcut)) {
+      setPreferences(prev => ({ ...prev, keyboardShortcut: tempShortcut }));
+      setIsRecordingShortcut(false);
+      setShortcutError('');
+      window.ipcRenderer?.send('update-keyboard-shortcut', tempShortcut);
+    } else {
+      setShortcutError('Please use at least one modifier key (Ctrl, Shift, Alt) and one regular key');
+    }
+  }, [tempShortcut, validateShortcut]);
+
   // Update main process whenever preferences change
   useEffect(() => {
     if (preferences.darkMode) {
@@ -99,6 +121,7 @@ export default function ScreenBlinkHomepage() {
     window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
     window.ipcRenderer?.send('update-exercise-interval', preferences.exerciseInterval);
     window.ipcRenderer?.send('update-popup-colors', preferences.popupColors);
+    window.ipcRenderer?.send('update-popup-message', preferences.popupMessage);
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
     window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
   }, [preferences]);
@@ -107,6 +130,19 @@ export default function ScreenBlinkHomepage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isRecordingShortcut) {
         e.preventDefault();
+
+        // Handle Enter and Escape to save or cancel
+        if (e.key === 'Enter') {
+          handleSaveShortcut();
+          return;
+        }
+        if (e.key === 'Escape') {
+          setIsRecordingShortcut(false);
+          setTempShortcut('');
+          setShortcutError('');
+          return;
+        }
+        
         const keys = [];
         if (e.ctrlKey) keys.push('Ctrl');
         if (e.shiftKey) keys.push('Shift');
@@ -114,7 +150,7 @@ export default function ScreenBlinkHomepage() {
         if (e.metaKey) keys.push('Meta');
         
         // Only add the key if it's not a modifier
-        if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+        if (!['Control', 'Shift', 'Alt', 'Meta', 'Enter', 'Escape'].includes(e.key)) {
           keys.push(e.key.toUpperCase());
         }
         
@@ -149,7 +185,7 @@ export default function ScreenBlinkHomepage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRecordingShortcut, preferences.keyboardShortcut, preferences.isTracking, preferences.reminderInterval]);
+  }, [isRecordingShortcut, preferences.keyboardShortcut, preferences.isTracking, preferences.reminderInterval, tempShortcut, handleSaveShortcut]);
 
   useEffect(() => {
     const handleCameraWindowClosed = () => setIsCameraWindowOpen(false);
@@ -158,24 +194,6 @@ export default function ScreenBlinkHomepage() {
       window.ipcRenderer?.off('camera-window-closed', handleCameraWindowClosed);
     };
   }, []);
-
-  const validateShortcut = (shortcut: string): boolean => {
-    if (!shortcut) return false;
-    const parts = shortcut.split('+');
-    if (parts.length < 2) return false;
-    return true;
-  };
-
-  const handleSaveShortcut = () => {
-    if (validateShortcut(tempShortcut)) {
-      setPreferences(prev => ({ ...prev, keyboardShortcut: tempShortcut }));
-      setIsRecordingShortcut(false);
-      setShortcutError('');
-      window.ipcRenderer?.send('update-keyboard-shortcut', tempShortcut);
-    } else {
-      setShortcutError('Please use at least one modifier key (Ctrl, Shift, Alt) and one regular key');
-    }
-  };
 
   const handleStartStop = () => {
     setPreferences(prev => ({ ...prev, isTracking: !prev.isTracking }));
@@ -629,9 +647,64 @@ export default function ScreenBlinkHomepage() {
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
                     <div className="flex items-center gap-2 mb-3">
                       <Palette className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                      <span className="font-medium text-gray-800 dark:text-white text-sm">Popup Colors</span>
+                      <span className="font-medium text-gray-800 dark:text-white text-sm">Popup Appearance</span>
                     </div>
                     <div className="space-y-4">
+                      {/* Message Customization */}
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Popup Message</label>
+                        {isEditingMessage ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={tempMessage}
+                              onChange={(e) => setTempMessage(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setPreferences(prev => ({ ...prev, popupMessage: tempMessage }));
+                                  setIsEditingMessage(false);
+                                } else if (e.key === 'Escape') {
+                                  setIsEditingMessage(false);
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                              autoFocus
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setPreferences(prev => ({ ...prev, popupMessage: tempMessage }));
+                                  setIsEditingMessage(false);
+                                }}
+                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setIsEditingMessage(false)}
+                                className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">"{preferences.popupMessage}"</p>
+                            <button
+                              onClick={() => {
+                                setTempMessage(preferences.popupMessage);
+                                setIsEditingMessage(true);
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Color Pickers */}
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Color</label>
                         <div className="flex items-center gap-2">

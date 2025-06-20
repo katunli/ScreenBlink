@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'load-preferences',
       'camera-error',
       'video-stream',
-      'camera-window-closed'
+      'camera-window-closed',
+      'update-message'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => func(...args));
@@ -29,6 +30,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-camera-enabled',
       'update-eye-exercises-enabled',
       'update-exercise-interval',
+      'update-popup-message',
       'update-keyboard-shortcut',
       'blink-detected',
       'start-camera-tracking',

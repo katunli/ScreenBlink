@@ -69,6 +69,11 @@
       updateColors(colors);
     });
 
+    // Listen for message updates
+    ipcRenderer.on('update-message', (event, message) => {
+      document.getElementById('blink').textContent = message;
+    });
+
     // Listen for camera mode updates
     ipcRenderer.on('camera-mode', (event, isEnabled) => {
       const blinkElement = document.getElementById('blink');

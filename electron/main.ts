@@ -86,6 +86,7 @@ const preferences = {
 		text: string;
 		opacity: number;
 	},
+	popupMessage: store.get('popupMessage', 'Blink!') as string,
 	isTracking: false,
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
@@ -165,6 +166,7 @@ function showBlinkPopup() {
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "blink.html"));
 	popup.webContents.on('did-finish-load', () => {
 		popup.webContents.send('update-colors', preferences.popupColors);
+		popup.webContents.send('update-message', preferences.popupMessage);
 		popup.webContents.send('camera-mode', preferences.cameraEnabled);
 		popup.setIgnoreMouseEvents(true);
 	});
@@ -580,6 +582,11 @@ ipcMain.on("update-interval", (_event, interval: number) => {
 ipcMain.on("update-popup-colors", (_event, colors) => {
 	preferences.popupColors = colors;
 	store.set('popupColors', colors);
+});
+
+ipcMain.on("update-popup-message", (_event, message: string) => {
+	preferences.popupMessage = message;
+	store.set('popupMessage', message);
 });
 
 ipcMain.on("update-dark-mode", (_event, darkMode: boolean) => {
@@ -1028,6 +1035,7 @@ ipcMain.on('reset-preferences', () => {
     text: '#00FF11',
     opacity: 0.7
   };
+  preferences.popupMessage = 'Blink!';
   preferences.isTracking = false;
   preferences.keyboardShortcut = 'Ctrl+I';
   preferences.blinkSensitivity = 0.20;
