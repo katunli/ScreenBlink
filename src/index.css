@@ -63,4 +63,19 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Hide scrollbars for webkit browsers (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hide scrollbars for Firefox */
+  * {
+    scrollbar-width: none;
+  }
+  
+  /* Hide scrollbars for IE and Edge */
+  * {
+    -ms-overflow-style: none;
+  }
 }
