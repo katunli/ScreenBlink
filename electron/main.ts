@@ -827,6 +827,10 @@ powerMonitor.on('suspend', () => {
 });
 
 powerMonitor.on('resume', () => {
+	// Reset exercise timer when computer wakes from sleep
+	// This ensures exercise popup shows 20 minutes after user returns
+	store.set('lastExerciseTime', Date.now());
+	
 	// If reminders were active and camera was enabled before sleep, restart them
 	if (wasTrackingBeforeSleep && wasCameraEnabledBeforeSleep) {
 		// Reset last blink time and start camera monitoring
