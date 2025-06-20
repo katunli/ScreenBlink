@@ -131,7 +131,6 @@ function showBlinkPopup() {
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
-
 	const popup = new BrowserWindow({
 		width: preferences.popupSize.width,
 		height: preferences.popupSize.height,
@@ -151,6 +150,14 @@ function showBlinkPopup() {
 			contextIsolation: false,
 		},
 	});
+
+	// Set window level to stay on top of fullscreen applications
+	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
+	popup.setAlwaysOnTop(true, level);
+	
+	// Make popup visible on all workspaces and fullscreen applications
+	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "blink.html"));
@@ -202,6 +209,14 @@ function showStoppedPopup() {
 			contextIsolation: false,
 		},
 	});
+
+	// Set window level to stay on top of fullscreen applications
+	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
+	popup.setAlwaysOnTop(true, level);
+	
+	// Make popup visible on all workspaces and fullscreen applications
+	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "stopped.html"));
@@ -681,6 +696,14 @@ function showExercisePopup() {
 		},
 	});
 
+	// Set window level to stay on top of fullscreen applications
+	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
+	popup.setAlwaysOnTop(true, level);
+	
+	// Make popup visible on all workspaces and fullscreen applications
+	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
 	currentExercisePopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "exercise.html"));
 	
@@ -909,6 +932,14 @@ function showPopupEditor() {
 			contextIsolation: false,
 		},
 	});
+
+	// Set window level to stay on top of fullscreen applications
+	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
+	popupEditorWindow.setAlwaysOnTop(true, level);
+	
+	// Make popup visible on all workspaces and fullscreen applications
+	popupEditorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
 	popupEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "popup-editor.html"));
 	
