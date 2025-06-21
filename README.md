@@ -20,11 +20,9 @@ The application uses:
 - Python with dlib for blink detection
 - OpenCV for video processing
 
-## License
-
-MIT
-
 ## Installation
+
+Download the latest version the [website](screenblink.vercel.app)
 
 ### macOS
 If you encounter a "ScreenBlink.app is damaged and can't be opened" error:
@@ -44,3 +42,7 @@ To proceed:
 2. Click **"Run anyway"**
 
 This does not mean the app is unsafe; it simply hasn't been code-signed.
+
+## License
+
+MIT
