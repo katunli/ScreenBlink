@@ -793,15 +793,12 @@ export default function ScreenBlinkHomepage() {
           </button>
         </div>
 
-        {/* Tips Section */}
-        <div className="mt-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
-          <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">💡 Tips for Better Eye Health</h3>
-          <ul className="text-sm text-blue-700 dark:text-blue-200 space-y-2">
-            <li>• Follow the 20-20-20 rule: Every 20 minutes, look at something 20 feet away for 20 seconds</li>
-            <li>• Blink frequently to keep your eyes moist, especially when using screens</li>
-            <li>• Adjust your screen brightness to match your surroundings</li>
-            <li>• Keep your screen about arm's length away from your eyes</li>
-          </ul>
+        {/* Gaming Disclaimer */}
+        <div className="mt-6 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
+          <h3 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">🎮 Gaming Notice</h3>
+          <p className="text-sm text-amber-700 dark:text-amber-200">
+            <strong>Important:</strong> If you plan to use blink reminders while playing video games, please use <strong>Borderless Windowed</strong> or <strong>Windowed</strong> mode instead of Fullscreen. Fullscreen games may be interrupted when popups appear, causing you to exit the game unexpectedly.
+          </p>
         </div>
       </div>
     </div>
