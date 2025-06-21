@@ -66,11 +66,13 @@
 			"dist-electron/**/*",
 			"python/**/*",
 			"electron/assets/models/**/*",
-			"build/**/*"
+			"build/**/*",
+			"public/sounds/**/*"
 		],
 		"asarUnpack": [
 			"python/**/*",
-			"electron/assets/models/**/*"
+			"electron/assets/models/**/*",
+			"public/sounds/**/*"
 		],
 		"mac": {
 			"target": [

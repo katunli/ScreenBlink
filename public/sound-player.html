@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sound Player</title>
+</head>
+<body>
+    <audio id="audio" preload="auto"></audio>
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        ipcRenderer.on('play-sound', (event, soundPath) => {
+            console.log('Sound player received path:', soundPath);
+            const audio = document.getElementById('audio');
+            audio.src = soundPath;
+            audio.play().catch(error => {
+                console.error('Error playing sound:', error);
+            });
+        });
+    </script>
+</body>
+</html> 

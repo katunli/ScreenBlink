@@ -90,7 +90,8 @@ const preferences = {
 	isTracking: false,
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
-	mgdMode: store.get('mgdMode', false) as boolean
+	mgdMode: store.get('mgdMode', false) as boolean,
+	soundEnabled: store.get('soundEnabled', false) as boolean
 };
 
 function createWindow() {
@@ -130,6 +131,9 @@ function showBlinkPopup() {
 		currentPopup.close();
 		currentPopup = null;
 	}
+	
+	// Play notification sound
+	playNotificationSound('blink');
 	
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
@@ -680,6 +684,9 @@ function showExercisePopup() {
 		return;
 	}
 
+	// Play notification sound
+	playNotificationSound('exercise');
+
 	isExerciseShowing = true;
 
 	// Close any existing exercise popup (extra safety)
@@ -815,6 +822,12 @@ ipcMain.on("snooze-exercise", () => {
 ipcMain.on("update-mgd-mode", (_event, enabled: boolean) => {
 	preferences.mgdMode = enabled;
 	store.set('mgdMode', enabled);
+});
+
+// Add IPC handler for sound preference
+ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
+	preferences.soundEnabled = enabled;
+	store.set('soundEnabled', enabled);
 });
 
 // Add cleanup for Python process in the app quit handler
@@ -1040,6 +1053,7 @@ ipcMain.on('reset-preferences', () => {
   preferences.keyboardShortcut = 'Ctrl+I';
   preferences.blinkSensitivity = 0.20;
   preferences.mgdMode = false;
+  preferences.soundEnabled = false;
   
   // Re-register the default keyboard shortcut
   registerGlobalShortcut(preferences.keyboardShortcut);
@@ -1050,3 +1064,52 @@ ipcMain.on('reset-preferences', () => {
     reminderInterval: preferences.reminderInterval / 1000
   });
 });
+
+// Add sound playing function
+function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'blink') {
+	if (preferences.soundEnabled) {
+		let soundFileName: string;
+		
+		switch (soundType) {
+			case 'exercise':
+				soundFileName = 'exercisePopup.mp3';
+				break;
+			case 'stopped':
+				soundFileName = 'stoppedPopup.mp3';
+				break;
+			case 'blink':
+			default:
+				soundFileName = 'notification.mp3';
+				break;
+		}
+		
+		const soundPath = isProd
+			? path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'sounds', soundFileName)
+			: path.join(process.env.APP_ROOT, 'public', 'sounds', soundFileName);
+		
+		console.log('Playing sound:', soundType, 'at path:', soundPath);
+		
+		// Create a hidden window to play the sound
+		const soundWindow = new BrowserWindow({
+			width: 1,
+			height: 1,
+			show: false,
+			webPreferences: {
+				nodeIntegration: true,
+				contextIsolation: false,
+			},
+		});
+		
+		soundWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'sound-player.html'));
+		soundWindow.webContents.on('did-finish-load', () => {
+			soundWindow.webContents.send('play-sound', soundPath);
+		});
+		
+		// Close the window after playing
+		setTimeout(() => {
+			if (!soundWindow.isDestroyed()) {
+				soundWindow.close();
+			}
+		}, 1000);
+	}
+}

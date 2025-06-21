@@ -45,7 +45,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'popup-editor-saved',
       'reset-preferences',
       'show-size-editor',
-      'size-saved'
+      'size-saved',
+      'update-sound-enabled'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, ...args);

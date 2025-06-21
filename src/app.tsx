@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, Palette } from 'lucide-react';
+import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, Palette, Volume2, VolumeX } from 'lucide-react';
 
 interface PopupColors {
   background: string;
@@ -23,6 +23,7 @@ interface UserPreferences {
   mgdMode: boolean;
   showMgdInfo: boolean;
   showPopupColors: boolean;
+  soundEnabled: boolean;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -44,7 +45,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   blinkSensitivity: 0.22,
   mgdMode: false,
   showMgdInfo: false,
-  showPopupColors: false
+  showPopupColors: false,
+  soundEnabled: false
 };
 
 export default function ScreenBlinkHomepage() {
@@ -124,6 +126,7 @@ export default function ScreenBlinkHomepage() {
     window.ipcRenderer?.send('update-popup-message', preferences.popupMessage);
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
     window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
+    window.ipcRenderer?.send('update-sound-enabled', preferences.soundEnabled);
   }, [preferences]);
 
   useEffect(() => {
@@ -779,6 +782,35 @@ export default function ScreenBlinkHomepage() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Sound Toggle */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {preferences.soundEnabled ? (
+                      <Volume2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    ) : (
+                      <VolumeX className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    )}
+                    <span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">Notification Sound</span>
+                  </div>
+                  <button
+                    onClick={() => setPreferences(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      preferences.soundEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        preferences.soundEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  Play sounds for blink reminders and exercise prompts
+                </p>
               </div>
             </div>
           </div>
