@@ -22,7 +22,7 @@ The application uses:
 
 ## Installation
 
-Download the latest version on the [website](screenblink.vercel.app)
+Download the latest version on the [website](https://screenblink.vercel.app)
 
 ### macOS
 If you encounter a "ScreenBlink.app is damaged and can't be opened" error:
