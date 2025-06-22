@@ -2,24 +2,18 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-  workflow_dispatch:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '18'
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-        include:
-          - os: macos-latest
-            platform: mac
-          - os: windows-latest
-            platform: win
-
+  build-mac:
+    runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,32 +21,41 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "python/requirements.txt" ]; then
+            pip install -r python/requirements.txt
+          fi
+
+      - name: Build application (tsc && vite build && electron-builder)
         run: npm run build
         env:
-          CI: true
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload build artifacts
+      - name: Remove quarantine attributes
+        run: node scripts/remove-quarantine.js
+
+      - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-build
-          path: |
-            release/
-            dist/
-            dist-electron/
+          name: ScreenBlink-macOS
+          path: dist/*.dmg
           retention-days: 30
 
-  create-release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
+  build-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -60,23 +63,53 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          files: |
-            artifacts/mac-build/release/*.dmg
-            artifacts/mac-build/release/*.zip
-            artifacts/win-build/release/*.exe
-            artifacts/win-build/release/*.zip
-          draft: false
-          prerelease: false
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path "python/requirements.txt") {
+            pip install -r python/requirements.txt
+          }
+
+      - name: Build application (tsc && vite build && electron-builder)
+        run: npm run build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenBlink-Windows
+          path: dist/*.exe
+          retention-days: 30
+
+  create-release:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release Assets
+        run: |
+          mkdir -p release-assets
+          cp ScreenBlink-macOS/*.dmg release-assets/ || true
+          cp ScreenBlink-Windows/*.exe release-assets/ || true
+
+      - name: Upload Release Assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: Release-Assets
+          path: release-assets/
+          retention-days: 90 
