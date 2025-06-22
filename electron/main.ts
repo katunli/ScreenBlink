@@ -6,6 +6,11 @@ import Store from 'electron-store';
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 
+// Suppress NSWindow panel styleMask warnings on macOS
+if (process.platform === 'darwin') {
+	process.env.NSWindowSupportsNonactivatingPanel = 'true';
+}
+
 createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -152,6 +157,7 @@ function showBlinkPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
+		type: 'panel', // Enable floating on top of full-screened apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -164,7 +170,11 @@ function showBlinkPopup() {
 	popup.setAlwaysOnTop(true, level);
 	
 	// Make popup visible on all workspaces and fullscreen applications
-	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+	// Use skipTransformProcessType to prevent dock hiding
+	popup.setVisibleOnAllWorkspaces(true, { 
+		visibleOnFullScreen: true,
+		skipTransformProcessType: true 
+	});
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "blink.html"));
@@ -212,6 +222,7 @@ function showStoppedPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
+		type: 'panel', // Enable floating on top of full-screened apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -224,7 +235,11 @@ function showStoppedPopup() {
 	popup.setAlwaysOnTop(true, level);
 	
 	// Make popup visible on all workspaces and fullscreen applications
-	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+	// Use skipTransformProcessType to prevent dock hiding
+	popup.setVisibleOnAllWorkspaces(true, { 
+		visibleOnFullScreen: true,
+		skipTransformProcessType: true 
+	});
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "stopped.html"));
@@ -717,6 +732,7 @@ function showExercisePopup() {
 		focusable: true,
 		show: false,
 		hasShadow: false,
+		type: 'panel', // Enable floating on top of full-screened apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -729,7 +745,11 @@ function showExercisePopup() {
 	popup.setAlwaysOnTop(true, level);
 	
 	// Make popup visible on all workspaces and fullscreen applications
-	popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+	// Use skipTransformProcessType to prevent dock hiding
+	popup.setVisibleOnAllWorkspaces(true, { 
+		visibleOnFullScreen: true,
+		skipTransformProcessType: true 
+	});
 
 	currentExercisePopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "exercise.html"));
@@ -964,6 +984,7 @@ function showPopupEditor() {
 		show: false,
 		hasShadow: false,
 		movable: true,
+		type: 'panel', // Enable floating on top of full-screened apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -976,7 +997,11 @@ function showPopupEditor() {
 	popupEditorWindow.setAlwaysOnTop(true, level);
 	
 	// Make popup visible on all workspaces and fullscreen applications
-	popupEditorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+	// Use skipTransformProcessType to prevent dock hiding
+	popupEditorWindow.setVisibleOnAllWorkspaces(true, { 
+		visibleOnFullScreen: true,
+		skipTransformProcessType: true 
+	});
 
 	popupEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "popup-editor.html"));
 	
