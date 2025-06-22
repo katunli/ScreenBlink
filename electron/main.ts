@@ -1114,9 +1114,7 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 		const soundPath = isProd
 			? path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'sounds', soundFileName)
 			: path.join(process.env.APP_ROOT, 'public', 'sounds', soundFileName);
-		
-		console.log('Playing sound:', soundType, 'at path:', soundPath);
-		
+				
 		// Create a hidden window to play the sound
 		const soundWindow = new BrowserWindow({
 			width: 1,
