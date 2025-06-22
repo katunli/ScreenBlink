@@ -932,6 +932,9 @@ app.whenReady().then(() => {
 	// Register the initial shortcut
 	registerGlobalShortcut(preferences.keyboardShortcut);
 	
+	// Reset exercise timer when app starts
+	store.set('lastExerciseTime', Date.now());
+	
 	// Start exercise monitoring if enabled
 	if (preferences.eyeExercisesEnabled) {
 		startExerciseMonitoring();
