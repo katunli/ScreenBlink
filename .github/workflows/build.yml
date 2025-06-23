@@ -13,10 +13,12 @@ env:
 
 jobs:
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,6 +40,17 @@ jobs:
           if [ -f "python/requirements.txt" ]; then
             pip install -r python/requirements.txt
           fi
+          
+      - name: List repo contents for debugging
+        run: |
+          echo "Listing root directory:"
+          ls -l
+          echo "\nListing python directory:"
+          ls -l python/
+          echo "\nListing models directory:"
+          ls -l electron/assets/models/
+          echo "\nListing sounds directory:"
+          ls -l public/sounds/
 
       - name: Build application (tsc && vite build && electron-builder)
         run: npm run build
@@ -59,6 +72,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -80,6 +95,17 @@ jobs:
           if (Test-Path "python/requirements.txt") {
             pip install -r python/requirements.txt
           }
+          
+      - name: List repo contents for debugging
+        run: |
+          echo "Listing root directory:"
+          dir
+          echo "Listing python directory:"
+          dir python
+          echo "Listing models directory:"
+          dir electron\assets\models
+          echo "Listing sounds directory:"
+          dir public\sounds
 
       - name: Build application (tsc && vite build && electron-builder)
         run: npm run build
