@@ -58,4 +58,3 @@ env.bak/
 venv.bak/
 
 # Model files
-electron/assets/models/shape_predictor_68_face_landmarks.dat
