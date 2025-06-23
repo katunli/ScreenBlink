@@ -13,7 +13,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+      with:
+        lfs: true
+        
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -40,9 +42,13 @@ jobs:
       run: |
         if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
           Write-Error "Shape predictor file not found!"
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Contents of electron/assets/models/:"
+          Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
           exit 1
         }
         Write-Host "Shape predictor file found successfully"
+        Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
         
     - name: Build application
       run: npm run build
