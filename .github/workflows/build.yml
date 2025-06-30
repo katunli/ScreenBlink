@@ -34,49 +34,22 @@ jobs:
           echo "Shape predictor file found successfully"
           echo "File size: $(stat -f%z electron/assets/models/shape_predictor_68_face_landmarks.dat) bytes"
 
-      - name: Setup Python environment
+      - name: Verify binary file exists
         run: |
-          cd python
-          chmod +x setup.sh
-          ./setup.sh
-
-      - name: Build Python binary
-        run: |
-          cd python
-          chmod +x build_and_install.sh
-          ./build_and_install.sh
-
-      - name: Verify binary was built correctly
-        run: |
-          echo "🔍 Verifying binary build..."
-          
-          # Check if binary exists
-          if [ ! -f "python/dist/blink_detector" ]; then
-            echo "❌ Binary not found at python/dist/blink_detector"
-            ls -la python/dist/ || true
+          if [ ! -f "electron/resources/blink_detector" ]; then
+            echo "Binary file not found!"
+            echo "Current directory: $(pwd)"
+            echo "Contents of electron/resources/:"
+            ls -la electron/resources/ || true
             exit 1
           fi
-          
-          # Check binary size (should be around 117MB)
-          BINARY_SIZE=$(stat -f%z python/dist/blink_detector)
-          echo "📦 Binary size: $BINARY_SIZE bytes ($(($BINARY_SIZE / 1024 / 1024))MB)"
-          
-          if [ $BINARY_SIZE -lt 50000000 ]; then
-            echo "❌ Binary seems too small (less than 50MB). Build may have failed."
-            exit 1
-          fi
+          echo "Binary file found successfully"
+          echo "File size: $(stat -f%z electron/resources/blink_detector) bytes"
           
           # Check if binary is executable
-          if [ ! -x "python/dist/blink_detector" ]; then
-            echo "❌ Binary is not executable"
-            ls -la python/dist/blink_detector
-            exit 1
-          fi
-          
-          # Check if binary was installed to Electron resources
-          if [ ! -f "electron/resources/blink_detector" ]; then
-            echo "❌ Binary not installed to electron/resources/blink_detector"
-            ls -la electron/resources/ || true
+          if [ ! -x "electron/resources/blink_detector" ]; then
+            echo "Binary is not executable"
+            ls -la electron/resources/blink_detector
             exit 1
           fi
           
@@ -85,14 +58,13 @@ jobs:
       - name: Test binary functionality
         run: |
           echo "🧪 Testing binary functionality..."
-          cd python
           
           # Copy the model file to the expected location for testing
-          mkdir -p dist/assets/models
-          cp ../electron/assets/models/shape_predictor_68_face_landmarks.dat dist/assets/models/
+          mkdir -p electron/resources/assets/models
+          cp electron/assets/models/shape_predictor_68_face_landmarks.dat electron/resources/assets/models/
           
           # Test that binary can start and doesn't crash immediately
-          timeout 10s ./dist/blink_detector > test_output.log 2>&1 || {
+          timeout 10s electron/resources/blink_detector > test_output.log 2>&1 || {
             # Check if it's just a timeout (which is expected) or an actual error
             if [ $? -eq 124 ]; then
               echo "✅ Binary started successfully (timeout is expected without camera)"
@@ -166,11 +138,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
       - name: Verify shape predictor file exists
         run: |
           if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
@@ -183,56 +150,30 @@ jobs:
           Write-Host "Shape predictor file found successfully"
           Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
 
-      - name: Setup Python environment
+      - name: Verify binary file exists
         run: |
-          cd python
-          .\setup.bat
-
-      - name: Build Python binary
-        run: |
-          cd python
-          .\build_and_install.bat
-
-      - name: Verify binary was built correctly
-        run: |
-          Write-Host "🔍 Verifying binary build..."
-          
-          # Check if binary exists
-          if (!(Test-Path "python/dist/blink_detector.exe")) {
-            Write-Error "Binary not found at python/dist/blink_detector.exe"
-            Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
-            exit 1
-          }
-          
-          # Check binary size (should be around 117MB)
-          $BINARY_SIZE = (Get-Item "python/dist/blink_detector.exe").Length
-          Write-Host "📦 Binary size: $BINARY_SIZE bytes ($([math]::Round($BINARY_SIZE / 1MB, 2))MB)"
-          
-          if ($BINARY_SIZE -lt 50000000) {
-            Write-Error "Binary seems too small (less than 50MB). Build may have failed."
-            exit 1
-          }
-          
-          # Check if binary was installed to Electron resources
           if (!(Test-Path "electron/resources/blink_detector.exe")) {
-            Write-Error "Binary not installed to electron/resources/blink_detector.exe"
+            Write-Error "Binary file not found!"
+            Write-Host "Current directory: $(Get-Location)"
+            Write-Host "Contents of electron/resources/:"
             Get-ChildItem "electron/resources/" -ErrorAction SilentlyContinue
             exit 1
           }
+          Write-Host "Binary file found successfully"
+          Write-Host "File size: $((Get-Item 'electron/resources/blink_detector.exe').Length) bytes"
           
           Write-Host "✅ Binary verification passed!"
 
       - name: Test binary functionality
         run: |
           Write-Host "🧪 Testing binary functionality..."
-          cd python
           
           # Copy the model file to the expected location for testing
-          New-Item -ItemType Directory -Force -Path "dist\assets\models" | Out-Null
-          Copy-Item "..\electron\assets\models\shape_predictor_68_face_landmarks.dat" "dist\assets\models\"
+          New-Item -ItemType Directory -Force -Path "electron\resources\assets\models" | Out-Null
+          Copy-Item "electron\assets\models\shape_predictor_68_face_landmarks.dat" "electron\resources\assets\models\"
           
           # Test that binary can start and doesn't crash immediately
-          $process = Start-Process -FilePath ".\dist\blink_detector.exe" -ArgumentList @() -PassThru -NoNewWindow
+          $process = Start-Process -FilePath "electron\resources\blink_detector.exe" -ArgumentList @() -PassThru -NoNewWindow
           
           # Wait a bit to see if it crashes
           Start-Sleep -Seconds 3
