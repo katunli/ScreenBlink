@@ -19,13 +19,13 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20.11.0'
         cache: 'npm'
         
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.13.3'
         
     - name: Install dependencies
       run: npm ci
@@ -85,13 +85,13 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20.11.0'
         cache: 'npm'
         
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.13.3'
         
     - name: Install dependencies
       run: npm ci
@@ -135,8 +135,9 @@ jobs:
           if [ -f "$dmg" ]; then
             echo "Mounting: $dmg"
             hdiutil attach "$dmg" -readonly
-            mount_point=$(hdiutil info | grep "/Volumes/" | tail -1 | awk '{print $3}')
-            if [ -n "$mount_point" ]; then
+            # Get the actual mount point more reliably
+            mount_point=$(hdiutil info | grep "/Volumes/" | grep -v "GUID_partition_scheme" | tail -1 | awk '{print $NF}')
+            if [ -n "$mount_point" ] && [ -d "$mount_point" ]; then
               echo "Mounted at: $mount_point"
               echo "Contents:"
               find "$mount_point" -type f | head -20
@@ -146,9 +147,15 @@ jobs:
               find "$mount_point" -path "*/python/*" -type f | head -10
               echo -e "\nModel files:"
               find "$mount_point" -name "*.dat" -o -name "*.model" | head -10
+              echo -e "\nDirectory structure:"
+              ls -la "$mount_point"
               hdiutil detach "$mount_point"
             else
-              echo "Failed to mount DMG"
+              echo "Failed to get valid mount point"
+              echo "Available volumes:"
+              hdiutil info | grep "/Volumes/"
+              # Try to detach any mounted volumes
+              hdiutil detach /Volumes/ScreenBlink* 2>/dev/null || true
             fi
           fi
         done
