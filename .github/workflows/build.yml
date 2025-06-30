@@ -87,10 +87,21 @@ jobs:
           echo "🧪 Testing binary functionality..."
           cd python
           
-          # Test that binary can start and respond to basic input
-          echo '{"ear_threshold": 0.25}' | timeout 10s ./dist/blink_detector > /dev/null 2>&1 || {
-            echo "❌ Binary failed to start or respond to input"
-            exit 1
+          # Copy the model file to the expected location for testing
+          mkdir -p dist/assets/models
+          cp ../electron/assets/models/shape_predictor_68_face_landmarks.dat dist/assets/models/
+          
+          # Test that binary can start and doesn't crash immediately
+          timeout 10s ./dist/blink_detector > test_output.log 2>&1 || {
+            # Check if it's just a timeout (which is expected) or an actual error
+            if [ $? -eq 124 ]; then
+              echo "✅ Binary started successfully (timeout is expected without camera)"
+            else
+              echo "❌ Binary failed to start or crashed"
+              echo "Test output:"
+              cat test_output.log || true
+              exit 1
+            fi
           }
           
           echo "✅ Binary functionality test passed!"
@@ -216,12 +227,19 @@ jobs:
           Write-Host "🧪 Testing binary functionality..."
           cd python
           
-          # Test that binary can start and respond to basic input
+          # Copy the model file to the expected location for testing
+          New-Item -ItemType Directory -Force -Path "dist\assets\models" | Out-Null
+          Copy-Item "..\electron\assets\models\shape_predictor_68_face_landmarks.dat" "dist\assets\models\"
+          
+          # Test that binary can start and doesn't crash immediately
           $process = Start-Process -FilePath ".\dist\blink_detector.exe" -ArgumentList @() -PassThru -NoNewWindow
-          Start-Sleep -Seconds 2
+          
+          # Wait a bit to see if it crashes
+          Start-Sleep -Seconds 3
           
           if ($process.HasExited) {
-            Write-Error "Binary failed to start or exited immediately"
+            $exitCode = $process.ExitCode
+            Write-Error "Binary exited with code: $exitCode"
             exit 1
           }
           
