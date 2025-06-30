@@ -41,13 +41,19 @@ def main():
     # Initialize dlib's face detector and facial landmark predictor
     detector = dlib.get_frontal_face_detector()
     
-    # Get the model path relative to the app root
-    app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    predictor_path = os.path.join(app_root, 'electron', 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
+    # Get the model path - handle both development and bundled scenarios
+    if getattr(sys, 'frozen', False):
+        # Running as bundled binary
+        base_path = sys._MEIPASS
+        predictor_path = os.path.join(base_path, 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
+    else:
+        # Running as script in development
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        predictor_path = os.path.join(app_root, 'electron', 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
     
     # Check if model exists
     if not os.path.exists(predictor_path):
-        print(json.dumps({"error": "Facial landmark model not found. Please ensure the model file is present in electron/assets/models/"}))
+        print(json.dumps({"error": f"Facial landmark model not found at: {predictor_path}"}))
         sys.exit(1)
     
     predictor = dlib.shape_predictor(predictor_path)

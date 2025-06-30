@@ -117,12 +117,9 @@ jobs:
         echo "File size: $(stat -f%z electron/assets/models/shape_predictor_68_face_landmarks.dat) bytes"
         
     - name: Build application
-      run: npm run build:mac
+      run: npm run build
       env:
         CI: true
-        
-    - name: Remove quarantine attributes
-      run: npm run remove-quarantine:dmg
         
     - name: List DMG contents for debugging
       run: |
