@@ -35,14 +35,6 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
 const isProd = app.isPackaged;
 
-const unpackedPythonPath = isProd
-    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'venv', 'bin', 'python')
-    : path.join(process.env.APP_ROOT, 'python', 'venv', 'bin', 'python');
-
-const pythonScriptPath = isProd
-    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'blink_detector.py')
-    : path.join(process.env.APP_ROOT, 'python', 'blink_detector.py');
-
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 	? path.join(process.env.APP_ROOT, "public")
 	: RENDERER_DIST;
@@ -56,8 +48,8 @@ let currentPopup: BrowserWindow | null = null;
 let lastBlinkTime = Date.now();
 let cameraMonitoringInterval: NodeJS.Timeout | null = null;
 
-let pythonProcess: any = null;
-let isPythonRunning = false;
+let blinkDetectorProcess: any = null;
+let isBlinkDetectorRunning = false;
 let exerciseIntervalId: NodeJS.Timeout | null = null;
 let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
@@ -265,7 +257,7 @@ function startBlinkReminderLoop(interval: number) {
 	preferences.reminderInterval = interval;
 	
 	if (preferences.cameraEnabled) {
-		startPythonBlinkDetector();
+		startBlinkDetector();
 	}
 	
 	// Clear any existing interval
@@ -295,7 +287,7 @@ function stopBlinkReminderLoop() {
 		cameraMonitoringInterval = null;
 	}
 	
-	stopPythonBlinkDetector();
+	stopBlinkDetector();
 	
 	if (currentPopup) {
 		currentPopup.close();
@@ -368,9 +360,9 @@ function showCameraWindow() {
 	
 	// Wait for window to be ready before sending video stream
 	cameraWindow.webContents.on('did-finish-load', () => {
-		// Request video stream from Python process
-		if (pythonProcess && pythonProcess.stdin) {
-			pythonProcess.stdin.write(JSON.stringify({ 
+		// Request video stream from blink detector process
+		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
+			blinkDetectorProcess.stdin.write(JSON.stringify({ 
 				request_video: true 
 			}) + '\n');
 		}
@@ -388,28 +380,29 @@ function showCameraWindow() {
 	});
 }
 
-function startPythonBlinkDetector() {
-	if (isPythonRunning) return;
+function startBlinkDetector() {
+	if (isBlinkDetectorRunning) return;
 	
-	// Use the virtual environment Python if it exists, otherwise fall back to system Python
-	const pythonExecutable = process.platform === 'win32' 
-    ? (isProd
-        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'python', 'venv', 'Scripts', 'python.exe')
-        : path.join(process.env.APP_ROOT, 'python', 'venv', 'Scripts', 'python.exe'))
-    : unpackedPythonPath;
+	// Use the standalone binary instead of Python script
+	const binaryPath = isProd
+		? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'resources', 'blink_detector')
+		: path.join(process.env.APP_ROOT, 'electron', 'resources', 'blink_detector');
 
-	// Check if virtual environment exists
-	if (!existsSync(pythonExecutable)) {
-		console.error('Python virtual environment not found. Please run setup.sh first.');
+	// Add .exe extension for Windows
+	const executablePath = process.platform === 'win32' ? binaryPath + '.exe' : binaryPath;
+
+	// Check if binary exists
+	if (!existsSync(executablePath)) {
+		console.error('Blink detector binary not found. Please run the build script first: cd python && ./build_and_install.sh');
 		return;
 	}
 
-	pythonProcess = spawn(pythonExecutable, [pythonScriptPath], {
+	blinkDetectorProcess = spawn(executablePath, [], {
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
 
 	let buffer = '';
-	pythonProcess.stdout.on('data', (data: Buffer) => {
+	blinkDetectorProcess.stdout.on('data', (data: Buffer) => {
 		buffer += data.toString();
 		
 		// Process complete JSON messages
@@ -436,13 +429,13 @@ function startPythonBlinkDetector() {
 						currentPopup = null;
 					}
 				} else if (parsed.error) {
-					console.error('Python error:', parsed.error);
-					stopPythonBlinkDetector();
+					console.error('Blink detector error:', parsed.error);
+					stopBlinkDetector();
 				} else if (parsed.status) {
-					console.log('Python status:', parsed);
+					console.log('Blink detector status:', parsed);
 					// If the process is ready, send the initial sensitivity value
-					if (parsed.status === "Camera opened successfully" && pythonProcess.stdin) {
-						pythonProcess.stdin.write(JSON.stringify({ 
+					if (parsed.status === "Camera opened successfully" && blinkDetectorProcess.stdin) {
+						blinkDetectorProcess.stdin.write(JSON.stringify({ 
 							ear_threshold: preferences.blinkSensitivity,
 							frame_skip: FRAME_SKIP // Send frame skip setting to Python
 						}) + '\n');
@@ -459,30 +452,30 @@ function startPythonBlinkDetector() {
 					}
 				}
 			} catch (error) {
-				console.error('Failed to parse Python output:', error);
+				console.error('Failed to parse blink detector output:', error);
 			}
 		}
 	});
 
-	pythonProcess.stderr.on('data', (data: Buffer) => {
-		console.error('Python stderr:', data.toString());
+	blinkDetectorProcess.stderr.on('data', (data: Buffer) => {
+		console.error('Blink detector stderr:', data.toString());
 	});
 
-	pythonProcess.on('close', (code: number) => {
-		console.log('Python process exited with code:', code);
-		isPythonRunning = false;
-		pythonProcess = null;
+	blinkDetectorProcess.on('close', (code: number) => {
+		console.log('Blink detector process exited with code:', code);
+		isBlinkDetectorRunning = false;
+		blinkDetectorProcess = null;
 	});
 
-	isPythonRunning = true;
+	isBlinkDetectorRunning = true;
 }
 
-function stopPythonBlinkDetector() {
-	if (pythonProcess) {
-		pythonProcess.kill();
-		pythonProcess = null;
+function stopBlinkDetector() {
+	if (blinkDetectorProcess) {
+		blinkDetectorProcess.kill();
+		blinkDetectorProcess = null;
 	}
-	isPythonRunning = false;
+	isBlinkDetectorRunning = false;
 	
 	if (cameraWindow) {
 		cameraWindow.close();
@@ -499,9 +492,9 @@ function startCameraMonitoring() {
 	lastBlinkTime = Date.now();
 	frameCount = 0;
 	
-	// Ensure Python process is running
-	if (!isPythonRunning) {
-		startPythonBlinkDetector();
+	// Ensure blink detector process is running
+	if (!isBlinkDetectorRunning) {
+		startBlinkDetector();
 	}
 	
 	if (preferences.mgdMode) {
@@ -518,7 +511,7 @@ function startCameraMonitoring() {
 		
 		// Set up interval for subsequent popups
 		blinkIntervalId = setInterval(() => {
-			if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isPythonRunning) {
+			if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
 				showBlinkPopup();
 			}
 		}, preferences.reminderInterval + 2500); // Add 2.5s to account for popup fade out
@@ -526,7 +519,7 @@ function startCameraMonitoring() {
 		// Normal mode - only show popup if no blink detected
 		cameraMonitoringInterval = setInterval(() => {
 			const timeSinceLastBlink = Date.now() - lastBlinkTime;
-			if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isPythonRunning) {
+			if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isBlinkDetectorRunning) {
 				showBlinkPopup();
 				// Auto-close popup after 2.5 seconds
 				setTimeout(() => {
@@ -687,8 +680,8 @@ ipcMain.on("update-blink-sensitivity", (_event, sensitivity: number) => {
 	// Set a new timeout to update the threshold after 500ms of no changes
 	earThresholdUpdateTimeout = setTimeout(() => {
 		// Send the new threshold to the Python process if it's running
-		if (pythonProcess && pythonProcess.stdin) {
-			pythonProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
+		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
+			blinkDetectorProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
 		}
 	}, 500);
 });
@@ -852,7 +845,7 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
-	stopPythonBlinkDetector();
+	stopBlinkDetector();
 	stopExerciseMonitoring();
 	if (earThresholdUpdateTimeout) {
 		clearTimeout(earThresholdUpdateTimeout);
@@ -867,7 +860,7 @@ powerMonitor.on('suspend', () => {
 	wasCameraEnabledBeforeSleep = preferences.cameraEnabled;
 	
 	// Stop Python process and camera monitoring
-	stopPythonBlinkDetector();
+	stopBlinkDetector();
 	if (cameraMonitoringInterval) {
 		clearInterval(cameraMonitoringInterval);
 		cameraMonitoringInterval = null;
@@ -890,11 +883,11 @@ powerMonitor.on('resume', () => {
 		lastBlinkTime = Date.now();
 		
 		// Start Python process first
-		startPythonBlinkDetector();
+		startBlinkDetector();
 		
 		// Wait a brief moment to ensure Python process is ready
 		setTimeout(() => {
-			if (isPythonRunning) {
+			if (isBlinkDetectorRunning) {
 				// Only start camera monitoring if Python process is running
 				startCameraMonitoring();
 			} else {

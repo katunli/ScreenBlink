@@ -1,1 +1,2 @@
 *.dat filter=lfs diff=lfs merge=lfs -text 
+electron/resources/blink_detector filter=lfs diff=lfs merge=lfs -text
