@@ -1,4 +1,4 @@
-name: Build Windows Executable
+name: Build Executables
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     
     steps:
@@ -40,7 +40,7 @@ jobs:
         
     - name: Verify shape predictor file exists
       run: |
-        if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
+        if (!(Test-Path "electron/assets/models/shape_predictor_68_ˆface_landmarks.dat")) {
           Write-Error "Shape predictor file not found!"
           Write-Host "Current directory: $(Get-Location)"
           Write-Host "Contents of electron/assets/models/:"
@@ -67,8 +67,106 @@ jobs:
     - name: Upload installer
       uses: actions/upload-artifact@v4
       with:
-        name: screenblink-installer
+        name: screenblink-installer-windows
         path: |
           dist/*.exe
+          dist/*.zip
+        retention-days: 30
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Python dependencies
+      run: |
+        cd python
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        cd ..
+        
+    - name: Verify shape predictor file exists
+      run: |
+        if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
+          echo "Shape predictor file not found!"
+          echo "Current directory: $(pwd)"
+          echo "Contents of electron/assets/models/:"
+          ls -la electron/assets/models/ || true
+          exit 1
+        fi
+        echo "Shape predictor file found successfully"
+        echo "File size: $(stat -f%z electron/assets/models/shape_predictor_68_face_landmarks.dat) bytes"
+        
+    - name: Build application
+      run: npm run build:mac
+      env:
+        CI: true
+        
+    - name: Remove quarantine attributes
+      run: npm run remove-quarantine:dmg
+        
+    - name: List DMG contents for debugging
+      run: |
+        echo "=== DMG Contents Debug Info ==="
+        echo "Available DMG files:"
+        ls -la dist/*.dmg || echo "No DMG files found"
+        
+        echo -e "\n=== Mounting and listing DMG contents ==="
+        for dmg in dist/*.dmg; do
+          if [ -f "$dmg" ]; then
+            echo "Mounting: $dmg"
+            hdiutil attach "$dmg" -readonly
+            mount_point=$(hdiutil info | grep "/Volumes/" | tail -1 | awk '{print $3}')
+            if [ -n "$mount_point" ]; then
+              echo "Mounted at: $mount_point"
+              echo "Contents:"
+              find "$mount_point" -type f | head -20
+              echo -e "\nApp bundle contents:"
+              find "$mount_point" -name "*.app" -exec find {} -type f \; | head -20
+              echo -e "\nPython directory contents:"
+              find "$mount_point" -path "*/python/*" -type f | head -10
+              echo -e "\nModel files:"
+              find "$mount_point" -name "*.dat" -o -name "*.model" | head -10
+              hdiutil detach "$mount_point"
+            else
+              echo "Failed to mount DMG"
+            fi
+          fi
+        done
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenblink-macos
+        path: |
+          dist/
+          dist-electron/
+        retention-days: 30
+        
+    - name: Upload DMG and ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenblink-installer-macos
+        path: |
+          dist/*.dmg
           dist/*.zip
         retention-days: 30 
