@@ -241,8 +241,59 @@ jobs:
 
       - name: Setup Python environment
         run: |
-          cd python
-          .\setup.bat
+          Write-Host "Setting up blink detector Python environment..."
+          
+          # Check if Python is available
+          try {
+            python --version
+          } catch {
+            Write-Error "Python is not installed or not in PATH"
+            Write-Host "Please install Python 3.8+ and try again"
+            exit 1
+          }
+          
+          # Check if virtual environment already exists (from cache)
+          if (Test-Path "python\venv") {
+            Write-Host "Virtual environment already exists, checking if it's complete..."
+            
+            # Activate virtual environment to test
+            & "python\venv\Scripts\Activate.ps1"
+            
+            # Test if key packages are installed
+            try {
+              python -c "import cv2, numpy, dlib, PyInstaller"
+              Write-Host "OK: Virtual environment is complete and ready to use"
+              Write-Host "SUCCESS: Setup complete (using cached environment)!"
+              return
+            } catch {
+              Write-Host "Virtual environment exists but packages are missing, reinstalling..."
+              deactivate
+              Remove-Item -Recurse -Force "python\venv"
+            }
+          }
+          
+          # Create virtual environment
+          Write-Host "Creating virtual environment..."
+          python -m venv "python\venv"
+          
+          # Activate virtual environment
+          Write-Host "Activating virtual environment..."
+          & "python\venv\Scripts\Activate.ps1"
+          
+          # Upgrade pip
+          Write-Host "Upgrading pip..."
+          python -m pip install --upgrade pip
+          
+          # Install dependencies
+          Write-Host "Installing dependencies..."
+          pip install -r "python\requirements.txt"
+          
+          Write-Host "SUCCESS: Setup complete!"
+          Write-Host ""
+          Write-Host "Next steps:"
+          Write-Host "1. Run build_and_install.bat to build the standalone binary"
+          Write-Host "2. Test the binary with test_binary.py"
+          Write-Host "3. The binary will be installed to electron/resources/"
 
       - name: Debug before build
         run: |
@@ -259,8 +310,96 @@ jobs:
 
       - name: Build Python binary
         run: |
-          cd python
-          .\build_and_install.bat
+          Write-Host "Building and installing blink detector standalone binary..."
+          
+          # Check if virtual environment exists
+          if (!(Test-Path "python\venv")) {
+            Write-Error "Virtual environment not found. Please run setup first."
+            exit 1
+          }
+          
+          # Activate virtual environment
+          Write-Host "Activating virtual environment..."
+          & "python\venv\Scripts\Activate.ps1"
+          
+          # Verify virtual environment is active
+          Write-Host "Verifying virtual environment..."
+          $pythonPath = (Get-Command python).Source
+          Write-Host "Python executable: $pythonPath"
+          
+          if ($pythonPath -notlike "*\venv\Scripts\*") {
+            Write-Error "Virtual environment not properly activated!"
+            Write-Host "Expected: python\venv"
+            Write-Host "Actual: $pythonPath"
+            exit 1
+          }
+          Write-Host "OK: Virtual environment activated successfully"
+          
+          # Install PyInstaller if not already installed
+          Write-Host "Checking PyInstaller installation..."
+          try {
+            python -c "import PyInstaller"
+            Write-Host "PyInstaller is already installed"
+          } catch {
+            Write-Host "Installing PyInstaller..."
+            pip install pyinstaller
+          }
+          
+          # Test build environment
+          Write-Host "Testing build environment..."
+          python "python\test_build.py"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Build environment test failed!"
+            exit 1
+          }
+          
+          # Build the binary
+          Write-Host "Building binary..."
+          python "python\build_binary.py"
+          
+          # Check if build was successful
+          if (!(Test-Path "python\dist\blink_detector.exe")) {
+            Write-Error "Binary build failed! Checking for errors..."
+            Write-Host ""
+            Write-Host "Checking dist directory contents:"
+            if (Test-Path "python\dist") {
+              Get-ChildItem "python\dist"
+            } else {
+              Write-Host "Dist directory does not exist!"
+            }
+            Write-Host ""
+            Write-Host "Checking build directory contents:"
+            if (Test-Path "python\build") {
+              Get-ChildItem "python\build"
+            } else {
+              Write-Host "Build directory does not exist!"
+            }
+            Write-Host ""
+            Write-Host "Checking PyInstaller cache:"
+            if (Test-Path "$env:LOCALAPPDATA\pyinstaller") {
+              Get-ChildItem "$env:LOCALAPPDATA\pyinstaller"
+            }
+            exit 1
+          }
+          
+          Write-Host "OK: Binary built successfully!"
+          
+          # Test the binary
+          Write-Host "Testing binary..."
+          python "python\test_binary.py"
+          
+          # Install the binary to Electron resources
+          Write-Host "Installing binary to Electron resources..."
+          python "python\install_binary.py"
+          
+          Write-Host "SUCCESS: Build and installation complete!"
+          Write-Host ""
+          Write-Host "Your blink detector is now ready for distribution!"
+          Write-Host ""
+          Write-Host "Summary:"
+          Write-Host "- Standalone binary created: python/dist/blink_detector.exe"
+          Write-Host "- Binary installed to: electron/resources/blink_detector.exe"
+          Write-Host "- Binary size: ~117MB (includes Python + all dependencies)"
 
       - name: Debug after build
         run: |
