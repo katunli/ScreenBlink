@@ -15,6 +15,8 @@ BLINK_COOLDOWN = 0.5  # seconds
 
 # Global variables
 SEND_VIDEO = False
+CAMERA_ACTIVE = False
+cap = None
 
 def calculate_ear(eye_points):
     # Calculate the vertical distances
@@ -32,10 +34,44 @@ def encode_frame(frame):
     # Convert to base64
     return base64.b64encode(buffer).decode('utf-8')
 
-def main():
-    global SEND_VIDEO
+def start_camera():
+    """Start the camera and return success status"""
+    global cap, CAMERA_ACTIVE
     
-    print(json.dumps({"status": "Starting blink detector..."}))
+    if CAMERA_ACTIVE:
+        return True
+    
+    # Initialize video capture
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print(json.dumps({"error": "Failed to open camera"}))
+        return False
+    
+    # Set resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
+    CAMERA_ACTIVE = True
+    print(json.dumps({"status": "Camera opened successfully"}))
+    sys.stdout.flush()
+    return True
+
+def stop_camera():
+    """Stop the camera"""
+    global cap, CAMERA_ACTIVE
+    
+    if cap is not None:
+        cap.release()
+        cap = None
+    
+    CAMERA_ACTIVE = False
+    print(json.dumps({"status": "Camera released"}))
+    sys.stdout.flush()
+
+def main():
+    global SEND_VIDEO, CAMERA_ACTIVE, cap
+    
+    print(json.dumps({"status": "Starting blink detector in standby mode..."}))
     sys.stdout.flush()
     
     # Initialize dlib's face detector and facial landmark predictor
@@ -58,18 +94,8 @@ def main():
     
     predictor = dlib.shape_predictor(predictor_path)
     
-    # Initialize video capture
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print(json.dumps({"error": "Failed to open camera"}))
-        sys.exit(1)
-    
-    print(json.dumps({"status": "Camera opened successfully"}))
+    print(json.dumps({"status": "Models loaded successfully, ready for camera activation"}))
     sys.stdout.flush()
-    
-    # Set resolution
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     
     last_blink_time = time.time()
     current_ear_threshold = EAR_THRESHOLD
@@ -77,7 +103,7 @@ def main():
     
     try:
         while True:
-            # Check for new threshold value from stdin
+            # Check for commands from stdin
             if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 try:
                     line = sys.stdin.readline()
@@ -91,11 +117,27 @@ def main():
                             SEND_VIDEO = True
                             print(json.dumps({"status": "Video streaming enabled"}))
                             sys.stdout.flush()
+                        elif 'start_camera' in data:
+                            if start_camera():
+                                print(json.dumps({"status": "Camera started successfully"}))
+                            else:
+                                print(json.dumps({"error": "Failed to start camera"}))
+                            sys.stdout.flush()
+                        elif 'stop_camera' in data:
+                            stop_camera()
+                            SEND_VIDEO = False
+                            print(json.dumps({"status": "Camera stopped"}))
+                            sys.stdout.flush()
                 except json.JSONDecodeError:
                     pass
                 except Exception as e:
                     print(json.dumps({"error": f"Error processing input: {str(e)}"}))
                     sys.stdout.flush()
+            
+            # Only process frames if camera is active
+            if not CAMERA_ACTIVE or cap is None:
+                time.sleep(0.1)  # Sleep longer when camera is not active
+                continue
             
             ret, frame = cap.read()
             if not ret:
@@ -178,9 +220,7 @@ def main():
         print(json.dumps({"status": "Stopping blink detector..."}))
         sys.stdout.flush()
     finally:
-        cap.release()
-        print(json.dumps({"status": "Camera released"}))
-        sys.stdout.flush()
+        stop_camera()
 
 if __name__ == "__main__":
     main() 
