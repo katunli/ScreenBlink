@@ -28,7 +28,7 @@ def install_binary():
     
     # Check if binary exists
     if not source_path.exists():
-        print(f"❌ Binary not found at: {source_path}")
+        print(f"ERROR: Binary not found at: {source_path}")
         print("Please run the build script first: ./build.sh")
         return False
     
@@ -44,7 +44,7 @@ def install_binary():
             os.chmod(target_path, 0o755)
         
         size_mb = target_path.stat().st_size / (1024*1024)
-        print(f"✅ Binary installed successfully!")
+        print(f"OK: Binary installed successfully!")
         print(f"Source: {source_path}")
         print(f"Target: {target_path}")
         print(f"Size: {size_mb:.1f} MB")
@@ -52,14 +52,14 @@ def install_binary():
         return True
         
     except Exception as e:
-        print(f"❌ Error installing binary: {e}")
+        print(f"ERROR: Error installing binary: {e}")
         return False
 
 def create_platform_specific_install():
     """Create platform-specific installation instructions"""
     current_platform = platform.system()
     
-    print(f"\n📋 Platform-specific installation for {current_platform}:")
+    print(f"\nPlatform-specific installation for {current_platform}:")
     
     if current_platform == "Darwin":  # macOS
         print("For macOS distribution:")
@@ -80,13 +80,13 @@ def create_platform_specific_install():
         print("3. Include in your package")
 
 def main():
-    print("📦 Installing blink detector binary to Electron resources...")
+    print("Installing blink detector binary to Electron resources...")
     
     success = install_binary()
     
     if success:
-        print("\n🎉 Installation complete!")
-        print("\n📝 Next steps:")
+        print("\nSUCCESS: Installation complete!")
+        print("\nNext steps:")
         print("1. Update your Electron code to use the binary")
         print("2. Test the integration")
         print("3. Build your Electron app for distribution")
@@ -94,7 +94,7 @@ def main():
         # Show platform-specific info
         create_platform_specific_install()
         
-        print(f"\n💡 Example Electron code update:")
+        print(f"\nExample Electron code update:")
         print("```javascript")
         print("// Old way (Python script)")
         print("const pythonProcess = spawn('python', ['python/blink_detector.py'], {")
@@ -108,7 +108,7 @@ def main():
         print("});")
         print("```")
     else:
-        print("\n❌ Installation failed. Please check the build process.")
+        print("\nERROR: Installation failed. Please check the build process.")
 
 if __name__ == "__main__":
     main() 
