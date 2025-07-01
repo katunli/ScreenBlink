@@ -45,52 +45,67 @@ def build_binary():
     
     print("Building standalone binary...")
     print(f"Platform: {platform.system()} {platform.machine()}")
+    print(f"Script directory: {script_dir}")
+    print(f"Current working directory: {os.getcwd()}")
     
     # Check if spec file exists
     spec_file = script_dir / "blink_detector.spec"
     model_source = script_dir.parent / "electron" / "assets" / "models"
     
-    # Try to build with spec file first
-    if spec_file.exists():
-        print("Using existing spec file...")
-        try:
-            cmd = ["pyinstaller", "--clean", str(spec_file)]
-            print(f"Command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            print("PyInstaller output:")
-            print(result.stdout)
-        except subprocess.CalledProcessError as e:
-            print(f"Spec file build failed: {e}")
-            print("PyInstaller stderr:")
-            print(e.stderr)
-            print("Falling back to direct PyInstaller command...")
-            # Fall back to direct command
+    # Change to the script directory for PyInstaller
+    original_cwd = os.getcwd()
+    os.chdir(script_dir)
+    print(f"Changed working directory to: {os.getcwd()}")
+    
+    try:
+        # Try to build with spec file first
+        if spec_file.exists():
+            print("Using existing spec file...")
+            try:
+                cmd = ["pyinstaller", "--clean", "blink_detector.spec"]
+                print(f"Command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                print("PyInstaller output:")
+                print(result.stdout)
+                if result.stderr:
+                    print("PyInstaller stderr:")
+                    print(result.stderr)
+            except subprocess.CalledProcessError as e:
+                print(f"Spec file build failed: {e}")
+                print("PyInstaller stderr:")
+                print(e.stderr)
+                print("Falling back to direct PyInstaller command...")
+                # Fall back to direct command
+                build_with_direct_command(blink_detector_path, model_source)
+        else:
+            print("Creating new build with PyInstaller...")
             build_with_direct_command(blink_detector_path, model_source)
-    else:
-        print("Creating new build with PyInstaller...")
-        build_with_direct_command(blink_detector_path, model_source)
-    
-    # Check if binary was created
-    exe_name = get_executable_name()
-    exe_path = dist_dir / exe_name
-    
-    if exe_path.exists():
-        size_mb = exe_path.stat().st_size / (1024*1024)
-        print(f"\nSUCCESS: Binary created successfully!")
-        print(f"Location: {exe_path}")
-        print(f"Size: {size_mb:.1f} MB")
         
-        # Test if the binary is executable
-        if platform.system() != "Windows":
-            os.chmod(exe_path, 0o755)
-            print("OK: Made binary executable")
-    else:
-        print(f"ERROR: Binary not found at expected location: {exe_path}")
-        print("Checking dist directory contents:")
-        if dist_dir.exists():
-            for item in dist_dir.iterdir():
-                print(f"  - {item.name}")
-        sys.exit(1)
+        # Check if binary was created
+        exe_name = get_executable_name()
+        exe_path = dist_dir / exe_name
+        
+        if exe_path.exists():
+            size_mb = exe_path.stat().st_size / (1024*1024)
+            print(f"\nSUCCESS: Binary created successfully!")
+            print(f"Location: {exe_path}")
+            print(f"Size: {size_mb:.1f} MB")
+            
+            # Test if the binary is executable
+            if platform.system() != "Windows":
+                os.chmod(exe_path, 0o755)
+                print("OK: Made binary executable")
+        else:
+            print(f"ERROR: Binary not found at expected location: {exe_path}")
+            print("Checking dist directory contents:")
+            if dist_dir.exists():
+                for item in dist_dir.iterdir():
+                    print(f"  - {item.name}")
+            sys.exit(1)
+    finally:
+        # Restore original working directory
+        os.chdir(original_cwd)
+        print(f"Restored working directory to: {os.getcwd()}")
 
 def build_with_direct_command(blink_detector_path, model_source):
     """Build using direct PyInstaller command"""
@@ -102,16 +117,18 @@ def build_with_direct_command(blink_detector_path, model_source):
             "--clean",
             "--onefile",
             "--name=blink_detector",
-            str(blink_detector_path)
+            "blink_detector.py"
         ]
     else:
+        # Use relative paths since we're now in the script directory
+        relative_model_path = model_source.relative_to(Path.cwd())
         cmd = [
             "pyinstaller",
             "--clean",
             "--onefile",
             "--name=blink_detector",
-            f"--add-data={model_source}:assets/models",
-            str(blink_detector_path)
+            f"--add-data={relative_model_path}:assets/models",
+            "blink_detector.py"
         ]
     
     print(f"Command: {' '.join(cmd)}")
@@ -119,6 +136,9 @@ def build_with_direct_command(blink_detector_path, model_source):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print("PyInstaller output:")
         print(result.stdout)
+        if result.stderr:
+            print("PyInstaller stderr:")
+            print(result.stderr)
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Build failed with error: {e}")
         print("PyInstaller stderr:")

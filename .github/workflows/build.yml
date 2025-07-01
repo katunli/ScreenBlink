@@ -357,6 +357,16 @@ jobs:
           Write-Host "Building binary..."
           python "python\build_binary.py"
           
+          # Add debugging to see what happened
+          Write-Host "Build completed, checking results..."
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Contents of python directory:"
+          Get-ChildItem "python\" -ErrorAction SilentlyContinue
+          Write-Host "Contents of python\dist directory:"
+          Get-ChildItem "python\dist\" -ErrorAction SilentlyContinue
+          Write-Host "Contents of python\build directory:"
+          Get-ChildItem "python\build\" -ErrorAction SilentlyContinue
+          
           # Check if build was successful
           if (!(Test-Path "python\dist\blink_detector.exe")) {
             Write-Error "Binary build failed! Checking for errors..."
