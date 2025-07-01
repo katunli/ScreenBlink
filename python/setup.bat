@@ -27,7 +27,7 @@ if exist "%SCRIPT_DIR%venv" (
     python -c "import cv2, numpy, dlib, PyInstaller" 2>nul && (
         echo OK: Virtual environment is complete and ready to use
         echo SUCCESS: Setup complete (using cached environment)!
-        goto :end
+        goto end
     ) || (
         echo Virtual environment exists but packages are missing, reinstalling...
         deactivate

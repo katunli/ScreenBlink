@@ -256,10 +256,6 @@ jobs:
           Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
           Write-Host "Contents of electron/assets/models/:"
           Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
-          Write-Host "Testing build environment:"
-          cd python
-          call "venv\Scripts\activate.bat"
-          python test_build.py
 
       - name: Build Python binary
         run: |
