@@ -22,6 +22,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/Library/Caches/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache PyInstaller
+        uses: actions/cache@v4
+        with:
+          path: |
+            python/build/
+            python/dist/
+            ~/.cache/pyinstaller
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
       - name: Verify shape predictor file exists
         run: |
           if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
@@ -123,23 +149,23 @@ jobs:
         run: |
           echo "🔍 Verifying macOS app artifacts..."
           
-          # Check if DMG was created
-          if [ ! -f "dist/ScreenBlink-1.0.0.dmg" ]; then
+          # Check if DMG was created (with correct naming for ARM64)
+          if [ ! -f "dist/ScreenBlink-1.0.0-arm64.dmg" ]; then
             echo "❌ DMG file not found"
             ls -la dist/ || true
             exit 1
           fi
           
-          # Check if ZIP was created
-          if [ ! -f "dist/ScreenBlink-1.0.0-mac.zip" ]; then
+          # Check if ZIP was created (with correct naming for ARM64)
+          if [ ! -f "dist/ScreenBlink-1.0.0-arm64-mac.zip" ]; then
             echo "❌ ZIP file not found"
             ls -la dist/ || true
             exit 1
           fi
           
           # Check file sizes
-          DMG_SIZE=$(stat -f%z dist/ScreenBlink-1.0.0.dmg)
-          ZIP_SIZE=$(stat -f%z dist/ScreenBlink-1.0.0-mac.zip)
+          DMG_SIZE=$(stat -f%z dist/ScreenBlink-1.0.0-arm64.dmg)
+          ZIP_SIZE=$(stat -f%z dist/ScreenBlink-1.0.0-arm64-mac.zip)
           
           echo "📦 DMG size: $DMG_SIZE bytes ($(($DMG_SIZE / 1024 / 1024))MB)"
           echo "📦 ZIP size: $ZIP_SIZE bytes ($(($ZIP_SIZE / 1024 / 1024))MB)"
@@ -156,8 +182,8 @@ jobs:
         with:
           name: ScreenBlink-macOS-v1.0.0
           path: |
-            dist/ScreenBlink-1.0.0.dmg
-            dist/ScreenBlink-1.0.0-mac.zip
+            dist/ScreenBlink-1.0.0-arm64.dmg
+            dist/ScreenBlink-1.0.0-arm64-mac.zip
 
   build-windows:
     runs-on: windows-latest
@@ -181,22 +207,44 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            %LOCALAPPDATA%\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache PyInstaller
+        uses: actions/cache@v4
+        with:
+          path: |
+            python/build/
+            python/dist/
+            %LOCALAPPDATA%\pyinstaller
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
       - name: Verify shape predictor file exists
         run: |
-          if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
-            Write-Error "Shape predictor file not found!"
-            Write-Host "Current directory: $(Get-Location)"
-            Write-Host "Contents of electron/assets/models/:"
-            Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
+          if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
+            echo "Shape predictor file not found!"
+            echo "Current directory: $(pwd)"
+            echo "Contents of electron/assets/models/:"
+            ls -la electron/assets/models/ || true
             exit 1
-          }
-          Write-Host "Shape predictor file found successfully"
-          Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
+          fi
+          echo "Shape predictor file found successfully"
+          echo "File size: $(stat -f%z electron/assets/models/shape_predictor_68_face_landmarks.dat) bytes"
 
       - name: Setup Python environment
         run: |
           cd python
-          .\setup.bat
+          chmod +x setup.sh
+          ./setup.sh
 
       - name: Debug before build
         run: |
@@ -208,6 +256,11 @@ jobs:
           Get-ChildItem "python/" -ErrorAction SilentlyContinue
           Write-Host "Contents of python/dist/ (if exists):"
           Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
+          Write-Host "Contents of electron/assets/models/:"
+          Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
+          Write-Host "Testing build environment:"
+          cd python
+          python test_build.py
 
       - name: Build Python binary
         run: |
