@@ -19,6 +19,17 @@ REM Activate virtual environment
 echo 📦 Activating virtual environment...
 call "%SCRIPT_DIR%venv\Scripts\activate.bat"
 
+REM Verify virtual environment is active
+echo 🔍 Verifying virtual environment...
+python -c "import sys; print('Python executable:', sys.executable)"
+if not "%VIRTUAL_ENV%"=="%SCRIPT_DIR%venv" (
+    echo ❌ Virtual environment not properly activated!
+    echo Expected: %SCRIPT_DIR%venv
+    echo Actual: %VIRTUAL_ENV%
+    exit /b 1
+)
+echo ✅ Virtual environment activated successfully
+
 REM Install PyInstaller if not already installed
 echo 🔧 Checking PyInstaller installation...
 python -c "import PyInstaller" 2>nul || (
@@ -26,9 +37,44 @@ python -c "import PyInstaller" 2>nul || (
     pip install pyinstaller
 )
 
+REM Test build environment
+echo 🧪 Testing build environment...
+python "%SCRIPT_DIR%test_build.py"
+if errorlevel 1 (
+    echo ❌ Build environment test failed!
+    exit /b 1
+)
+
 REM Build the binary
 echo 🔨 Building binary...
 python "%SCRIPT_DIR%build_binary.py"
+
+REM Check if build was successful
+if not exist "%SCRIPT_DIR%dist\blink_detector.exe" (
+    echo ❌ Binary build failed! Checking for errors...
+    echo.
+    echo 📁 Checking dist directory contents:
+    if exist "%SCRIPT_DIR%dist" (
+        dir "%SCRIPT_DIR%dist"
+    ) else (
+        echo Dist directory does not exist!
+    )
+    echo.
+    echo 📁 Checking build directory contents:
+    if exist "%SCRIPT_DIR%build" (
+        dir "%SCRIPT_DIR%build"
+    ) else (
+        echo Build directory does not exist!
+    )
+    echo.
+    echo 🔍 Checking PyInstaller cache:
+    if exist "%LOCALAPPDATA%\pyinstaller" (
+        dir "%LOCALAPPDATA%\pyinstaller"
+    )
+    exit /b 1
+)
+
+echo ✅ Binary built successfully!
 
 REM Test the binary
 echo 🧪 Testing binary...

@@ -1,11 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+from pathlib import Path
+
+# Get the directory of this spec file
+script_dir = Path(__file__).parent
+blink_detector_path = script_dir / "blink_detector.py"
+model_source = script_dir.parent / "electron" / "assets" / "models"
 
 a = Analysis(
-    ['/Users/katunli/Dev/Projects/ScreenBlink/python/blink_detector.py'],
+    [str(blink_detector_path)],
     pathex=[],
     binaries=[],
-    datas=[('../electron/assets/models', 'assets/models')],
+    datas=[(str(model_source), 'assets/models')] if model_source.exists() else [],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
