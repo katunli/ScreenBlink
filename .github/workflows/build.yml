@@ -164,6 +164,12 @@ jobs:
             dist/ScreenBlink-1.0.0-arm64.dmg
             dist/ScreenBlink-1.0.0-arm64-mac.zip
 
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenBlink-1.0.0-arm64.dmg
+          path: dist/ScreenBlink-1.0.0-arm64.dmg
+
   build-windows:
     runs-on: windows-latest
     steps:
@@ -522,4 +528,10 @@ jobs:
           name: ScreenBlink-Windows-v1.0.0
           path: |
             dist/ScreenBlink Setup 1.0.0.exe
-            dist/ScreenBlink-1.0.0-win.zip 
+            dist/ScreenBlink-1.0.0-win.zip
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenBlink.Setup.1.0.0.exe
+          path: dist/ScreenBlink Setup 1.0.0.exe 
