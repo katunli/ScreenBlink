@@ -2,3 +2,4 @@ setuptools>=65.5.0
 opencv-python>=4.8.1.78
 numpy>=1.24.3
 dlib>=19.24.9
+pyinstaller>=6.0.0
