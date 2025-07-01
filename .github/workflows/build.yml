@@ -96,15 +96,21 @@ jobs:
           cp ../electron/assets/models/shape_predictor_68_face_landmarks.dat dist/assets/models/
           
           # Test that binary can start and doesn't crash immediately
+          # In CI environment, camera will fail to initialize, which is expected
           timeout 10s ./dist/blink_detector > test_output.log 2>&1 || {
             # Check if it's just a timeout (which is expected) or an actual error
             if [ $? -eq 124 ]; then
               echo "✅ Binary started successfully (timeout is expected without camera)"
             else
-              echo "❌ Binary failed to start or crashed"
               echo "Test output:"
               cat test_output.log || true
-              exit 1
+              # Check if the error is just camera initialization failure (which is expected in CI)
+              if grep -q "Failed to open camera" test_output.log; then
+                echo "✅ Binary started successfully (camera failure is expected in CI environment)"
+              else
+                echo "❌ Binary failed to start or crashed with unexpected error"
+                exit 1
+              fi
             fi
           }
           
@@ -192,10 +198,30 @@ jobs:
           cd python
           .\setup.bat
 
+      - name: Debug before build
+        run: |
+          Write-Host "🔍 Debugging before build..."
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Python version:"
+          python --version
+          Write-Host "Contents of python directory:"
+          Get-ChildItem "python/" -ErrorAction SilentlyContinue
+          Write-Host "Contents of python/dist/ (if exists):"
+          Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
+
       - name: Build Python binary
         run: |
           cd python
           .\build_and_install.bat
+
+      - name: Debug after build
+        run: |
+          Write-Host "🔍 Debugging after build..."
+          Write-Host "Contents of python/dist/:"
+          Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
+          Write-Host "Contents of electron/resources/:"
+          Get-ChildItem "electron/resources/" -ErrorAction SilentlyContinue
+
       - name: Verify binary was built correctly
         run: |
           Write-Host "🔍 Verifying binary build..."
