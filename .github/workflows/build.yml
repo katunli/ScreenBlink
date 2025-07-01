@@ -230,21 +230,20 @@ jobs:
 
       - name: Verify shape predictor file exists
         run: |
-          if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
-            echo "Shape predictor file not found!"
-            echo "Current directory: $(pwd)"
-            echo "Contents of electron/assets/models/:"
-            ls -la electron/assets/models/ || true
+          if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
+            Write-Error "Shape predictor file not found!"
+            Write-Host "Current directory: $(Get-Location)"
+            Write-Host "Contents of electron/assets/models/:"
+            Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
             exit 1
-          fi
-          echo "Shape predictor file found successfully"
-          echo "File size: $(stat -f%z electron/assets/models/shape_predictor_68_face_landmarks.dat) bytes"
+          }
+          Write-Host "Shape predictor file found successfully"
+          Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
 
       - name: Setup Python environment
         run: |
           cd python
-          chmod +x setup.sh
-          ./setup.sh
+          .\setup.bat
 
       - name: Debug before build
         run: |

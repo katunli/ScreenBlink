@@ -43,83 +43,82 @@ def build_binary():
     dist_dir = script_dir / "dist"
     dist_dir.mkdir(exist_ok=True)
     
-    # Check if spec file exists and has correct paths
-    spec_file = script_dir / "blink_detector.spec"
-    if spec_file.exists():
-        print("Found existing spec file, checking paths...")
-        with open(spec_file, 'r') as f:
-            spec_content = f.read()
-        
-        # Check if spec file has absolute paths that need updating
-        if str(blink_detector_path.absolute()) not in spec_content:
-            print("Updating spec file with correct paths...")
-            spec_content = spec_content.replace(
-                "'/Users/katunli/Dev/Projects/ScreenBlink/python/blink_detector.py'",
-                f"'{blink_detector_path.absolute()}'"
-            )
-            with open(spec_file, 'w') as f:
-                f.write(spec_content)
-    
-    # PyInstaller command - try spec file first, then fallback to direct command
-    if spec_file.exists():
-        print("Using existing spec file...")
-        cmd = ["pyinstaller", "--clean", str(spec_file)]
-    else:
-        print("Creating new build with PyInstaller...")
-        # Fix the model path to be relative to the script directory
-        model_source = script_dir.parent / "electron" / "assets" / "models"
-        if not model_source.exists():
-            print(f"Warning: Model directory not found at {model_source}")
-            print("Will try to build without models (binary may not work properly)")
-            cmd = [
-                "pyinstaller",
-                "--clean",
-                "--onefile",
-                "--name=blink_detector",
-                str(blink_detector_path)
-            ]
-        else:
-            cmd = [
-                "pyinstaller",
-                "--clean",
-                "--onefile",
-                "--name=blink_detector",
-                f"--add-data={model_source}:assets/models",
-                str(blink_detector_path)
-            ]
-    
     print("Building standalone binary...")
     print(f"Platform: {platform.system()} {platform.machine()}")
-    print(f"Command: {' '.join(cmd)}")
     
+    # Check if spec file exists
+    spec_file = script_dir / "blink_detector.spec"
+    model_source = script_dir.parent / "electron" / "assets" / "models"
+    
+    # Try to build with spec file first
+    if spec_file.exists():
+        print("Using existing spec file...")
+        try:
+            cmd = ["pyinstaller", "--clean", str(spec_file)]
+            print(f"Command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print("PyInstaller output:")
+            print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print(f"Spec file build failed: {e}")
+            print("PyInstaller stderr:")
+            print(e.stderr)
+            print("Falling back to direct PyInstaller command...")
+            # Fall back to direct command
+            build_with_direct_command(blink_detector_path, model_source)
+    else:
+        print("Creating new build with PyInstaller...")
+        build_with_direct_command(blink_detector_path, model_source)
+    
+    # Check if binary was created
+    exe_name = get_executable_name()
+    exe_path = dist_dir / exe_name
+    
+    if exe_path.exists():
+        size_mb = exe_path.stat().st_size / (1024*1024)
+        print(f"\n✅ Binary created successfully!")
+        print(f"Location: {exe_path}")
+        print(f"Size: {size_mb:.1f} MB")
+        
+        # Test if the binary is executable
+        if platform.system() != "Windows":
+            os.chmod(exe_path, 0o755)
+            print("✅ Made binary executable")
+    else:
+        print(f"❌ Binary not found at expected location: {exe_path}")
+        print("Checking dist directory contents:")
+        if dist_dir.exists():
+            for item in dist_dir.iterdir():
+                print(f"  - {item.name}")
+        sys.exit(1)
+
+def build_with_direct_command(blink_detector_path, model_source):
+    """Build using direct PyInstaller command"""
+    if not model_source.exists():
+        print(f"Warning: Model directory not found at {model_source}")
+        print("Will try to build without models (binary may not work properly)")
+        cmd = [
+            "pyinstaller",
+            "--clean",
+            "--onefile",
+            "--name=blink_detector",
+            str(blink_detector_path)
+        ]
+    else:
+        cmd = [
+            "pyinstaller",
+            "--clean",
+            "--onefile",
+            "--name=blink_detector",
+            f"--add-data={model_source}:assets/models",
+            str(blink_detector_path)
+        ]
+    
+    print(f"Command: {' '.join(cmd)}")
     try:
-        # Run PyInstaller with more verbose output
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print("PyInstaller output:")
         print(result.stdout)
-        
-        # Check if binary was created
-        exe_name = get_executable_name()
-        exe_path = dist_dir / exe_name
-        
-        if exe_path.exists():
-            size_mb = exe_path.stat().st_size / (1024*1024)
-            print(f"\n✅ Binary created successfully!")
-            print(f"Location: {exe_path}")
-            print(f"Size: {size_mb:.1f} MB")
-            
-            # Test if the binary is executable
-            if platform.system() != "Windows":
-                os.chmod(exe_path, 0o755)
-                print("✅ Made binary executable")
-        else:
-            print(f"❌ Binary not found at expected location: {exe_path}")
-            print("Checking dist directory contents:")
-            if dist_dir.exists():
-                for item in dist_dir.iterdir():
-                    print(f"  - {item.name}")
-            sys.exit(1)
-        
     except subprocess.CalledProcessError as e:
         print(f"❌ Build failed with error: {e}")
         print("PyInstaller stderr:")
