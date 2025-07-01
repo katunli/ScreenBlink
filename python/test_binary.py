@@ -15,11 +15,11 @@ def test_binary():
     binary_path = Path(__file__).parent / "dist" / "blink_detector"
     
     if not binary_path.exists():
-        print(f"❌ Binary not found at: {binary_path}")
+        print(f"ERROR: Binary not found at: {binary_path}")
         print("Please run the build script first: ./build.sh")
         return False
     
-    print(f"🧪 Testing binary: {binary_path}")
+    print(f"Testing binary: {binary_path}")
     print(f"Binary size: {binary_path.stat().st_size / (1024*1024):.1f} MB")
     
     try:
@@ -33,14 +33,14 @@ def test_binary():
             bufsize=1
         )
         
-        print("✅ Binary started successfully")
+        print("OK: Binary started successfully")
         
         # Send a test configuration
         test_config = {"ear_threshold": 0.25}
         process.stdin.write(json.dumps(test_config) + "\n")
         process.stdin.flush()
         
-        print("✅ Sent test configuration")
+        print("OK: Sent test configuration")
         
         # Read output for a few seconds
         start_time = time.time()
@@ -51,7 +51,7 @@ def test_binary():
                 line = process.stdout.readline()
                 if line:
                     output_lines.append(line.strip())
-                    print(f"📤 Output: {line.strip()}")
+                    print(f"Output: {line.strip()}")
             
             # Check if process is still running
             if process.poll() is not None:
@@ -65,33 +65,33 @@ def test_binary():
             process.kill()
             process.wait()
         
-        print("✅ Binary terminated successfully")
+        print("OK: Binary terminated successfully")
         
         # Check if we got any output
         if output_lines:
-            print(f"✅ Binary produced {len(output_lines)} lines of output")
+            print(f"OK: Binary produced {len(output_lines)} lines of output")
             return True
         else:
-            print("⚠️  No output received from binary")
+            print("WARNING: No output received from binary")
             return False
             
     except Exception as e:
-        print(f"❌ Error testing binary: {e}")
+        print(f"ERROR: Error testing binary: {e}")
         return False
 
 def main():
-    print("🧪 Testing standalone blink detector binary...")
+    print("Testing standalone blink detector binary...")
     
     success = test_binary()
     
     if success:
-        print("\n🎉 Binary test passed! The standalone executable works correctly.")
-        print("\n📝 You can now:")
+        print("\nSUCCESS: Binary test passed! The standalone executable works correctly.")
+        print("\nYou can now:")
         print("1. Copy the binary to your Electron app's resources folder")
         print("2. Update your Electron code to use the binary instead of Python script")
         print("3. Distribute your app without requiring Python installation")
     else:
-        print("\n❌ Binary test failed. Please check the build process.")
+        print("\nERROR: Binary test failed. Please check the build process.")
         sys.exit(1)
 
 if __name__ == "__main__":
