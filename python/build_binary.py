@@ -76,16 +76,16 @@ def build_binary():
     
     if exe_path.exists():
         size_mb = exe_path.stat().st_size / (1024*1024)
-        print(f"\n✅ Binary created successfully!")
+        print(f"\nSUCCESS: Binary created successfully!")
         print(f"Location: {exe_path}")
         print(f"Size: {size_mb:.1f} MB")
         
         # Test if the binary is executable
         if platform.system() != "Windows":
             os.chmod(exe_path, 0o755)
-            print("✅ Made binary executable")
+            print("OK: Made binary executable")
     else:
-        print(f"❌ Binary not found at expected location: {exe_path}")
+        print(f"ERROR: Binary not found at expected location: {exe_path}")
         print("Checking dist directory contents:")
         if dist_dir.exists():
             for item in dist_dir.iterdir():
@@ -120,7 +120,7 @@ def build_with_direct_command(blink_detector_path, model_source):
         print("PyInstaller output:")
         print(result.stdout)
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed with error: {e}")
+        print(f"ERROR: Build failed with error: {e}")
         print("PyInstaller stderr:")
         print(e.stderr)
         print("PyInstaller stdout:")
@@ -129,14 +129,14 @@ def build_with_direct_command(blink_detector_path, model_source):
 
 def create_cross_platform_builds():
     """Create builds for multiple platforms (requires Docker or cross-compilation setup)"""
-    print("\n🔄 For cross-platform builds, you can use:")
+    print("\nFor cross-platform builds, you can use:")
     print("1. Docker with multi-stage builds")
     print("2. GitHub Actions for automated builds")
     print("3. Virtual machines for each target platform")
     print("\nFor now, the binary is built for your current platform only.")
 
 def main():
-    print("🚀 Building blink detector standalone binary...")
+    print("Building blink detector standalone binary...")
     
     # Install PyInstaller if needed
     install_pyinstaller()
@@ -147,8 +147,8 @@ def main():
     # Show cross-platform build info
     create_cross_platform_builds()
     
-    print("\n🎉 Build complete! You can now distribute the binary with your Electron app.")
-    print("\n📝 Next steps:")
+    print("\nSUCCESS: Build complete! You can now distribute the binary with your Electron app.")
+    print("\nNext steps:")
     print("1. Copy the binary to your Electron app's resources folder")
     print("2. Update your Electron code to spawn the binary instead of Python script")
     print("3. Test the binary on a clean machine without Python installed")

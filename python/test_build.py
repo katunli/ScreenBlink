@@ -12,7 +12,7 @@ def test_build():
     """Test the build process"""
     script_dir = Path(__file__).parent
     
-    print("🧪 Testing build process...")
+    print("Testing build process...")
     print(f"Script directory: {script_dir}")
     print(f"Current working directory: {os.getcwd()}")
     
@@ -26,40 +26,40 @@ def test_build():
     for file in required_files:
         file_path = script_dir / file
         if file_path.exists():
-            print(f"✅ {file} exists")
+            print(f"OK: {file} exists")
         else:
-            print(f"❌ {file} missing")
+            print(f"ERROR: {file} missing")
             return False
     
     # Check if model directory exists
     model_dir = script_dir.parent / "electron" / "assets" / "models"
     if model_dir.exists():
-        print(f"✅ Model directory exists: {model_dir}")
+        print(f"OK: Model directory exists: {model_dir}")
         model_file = model_dir / "shape_predictor_68_face_landmarks.dat"
         if model_file.exists():
-            print(f"✅ Model file exists: {model_file}")
+            print(f"OK: Model file exists: {model_file}")
         else:
-            print(f"❌ Model file missing: {model_file}")
+            print(f"ERROR: Model file missing: {model_file}")
             return False
     else:
-        print(f"❌ Model directory missing: {model_dir}")
+        print(f"ERROR: Model directory missing: {model_dir}")
         return False
     
     # Test PyInstaller installation
     try:
         import PyInstaller
-        print("✅ PyInstaller is installed")
+        print("OK: PyInstaller is installed")
     except ImportError:
-        print("❌ PyInstaller is not installed")
+        print("ERROR: PyInstaller is not installed")
         return False
     
-    print("✅ All checks passed!")
+    print("OK: All checks passed!")
     return True
 
 if __name__ == "__main__":
     if test_build():
-        print("\n🎉 Build environment is ready!")
+        print("\nSUCCESS: Build environment is ready!")
         sys.exit(0)
     else:
-        print("\n❌ Build environment has issues!")
+        print("\nERROR: Build environment has issues!")
         sys.exit(1) 
