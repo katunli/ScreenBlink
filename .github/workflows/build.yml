@@ -27,27 +27,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip wheels
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/Library/Caches/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Cache PyInstaller
-        uses: actions/cache@v4
-        with:
-          path: |
-            python/build/
-            python/dist/
-            ~/.cache/pyinstaller
-          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
-          restore-keys: |
-            ${{ runner.os }}-pyinstaller-
-
       - name: Verify shape predictor file exists
         run: |
           if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
@@ -207,27 +186,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip wheels
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            %LOCALAPPDATA%\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Cache PyInstaller
-        uses: actions/cache@v4
-        with:
-          path: |
-            python/build/
-            python/dist/
-            %LOCALAPPDATA%\pyinstaller
-          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
-          restore-keys: |
-            ${{ runner.os }}-pyinstaller-
-
       - name: Verify shape predictor file exists
         run: |
           if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
@@ -240,6 +198,47 @@ jobs:
           Write-Host "Shape predictor file found successfully"
           Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
 
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            %LOCALAPPDATA%\pip\Cache
+            python/venv
+          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-${{ hashFiles('python/setup.bat') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-
+            ${{ runner.os }}-pip-
+
+      - name: Debug cache status
+        run: |
+          Write-Host "Cache debugging information:"
+          Write-Host "Checking if virtual environment exists:"
+          if (Test-Path "python/venv") {
+            Write-Host "OK: Virtual environment exists"
+            Write-Host "Virtual environment size: $((Get-ChildItem 'python/venv' -Recurse | Measure-Object -Property Length -Sum).Sum) bytes"
+          } else {
+            Write-Host "Virtual environment does not exist"
+          }
+          Write-Host "Checking pip cache directories:"
+          if (Test-Path "$env:LOCALAPPDATA\pip\Cache") {
+            Write-Host "OK: Pip cache exists"
+            Write-Host "Pip cache size: $((Get-ChildItem '$env:LOCALAPPDATA\pip\Cache' -Recurse | Measure-Object -Property Length -Sum).Sum) bytes"
+          } else {
+            Write-Host "Pip cache does not exist"
+          }
+
+      - name: Cache PyInstaller
+        uses: actions/cache@v4
+        with:
+          path: |
+            python/build/
+            python/dist/
+            %LOCALAPPDATA%\pyinstaller
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
       - name: Setup Python environment
         run: |
           cd python
@@ -247,7 +246,7 @@ jobs:
 
       - name: Debug before build
         run: |
-          Write-Host "🔍 Debugging before build..."
+          Write-Host "Debugging before build..."
           Write-Host "Current directory: $(Get-Location)"
           Write-Host "Python version:"
           python --version
@@ -259,6 +258,7 @@ jobs:
           Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
           Write-Host "Testing build environment:"
           cd python
+          call "venv\Scripts\activate.bat"
           python test_build.py
 
       - name: Build Python binary

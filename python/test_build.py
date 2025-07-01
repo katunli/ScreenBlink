@@ -51,6 +51,36 @@ def test_build():
         print("OK: PyInstaller is installed")
     except ImportError:
         print("ERROR: PyInstaller is not installed")
+        print("Available packages:")
+        try:
+            import pkg_resources
+            installed_packages = [d.project_name for d in pkg_resources.working_set]
+            for pkg in installed_packages:
+                print(f"  - {pkg}")
+        except:
+            print("  Could not list installed packages")
+        return False
+    
+    # Test other key packages
+    try:
+        import cv2
+        print("OK: OpenCV is installed")
+    except ImportError:
+        print("ERROR: OpenCV is not installed")
+        return False
+    
+    try:
+        import numpy
+        print("OK: NumPy is installed")
+    except ImportError:
+        print("ERROR: NumPy is not installed")
+        return False
+    
+    try:
+        import dlib
+        print("OK: dlib is installed")
+    except ImportError:
+        print("ERROR: dlib is not installed")
         return False
     
     print("OK: All checks passed!")
