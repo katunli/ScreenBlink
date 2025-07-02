@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'update-popup-position',
       'update-interval',
       'update-popup-colors',
+      'update-popup-transparency',
       'update-dark-mode',
       'update-camera-enabled',
       'update-eye-exercises-enabled',
