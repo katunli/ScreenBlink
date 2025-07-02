@@ -78,11 +78,11 @@ const preferences = {
 	popupColors: store.get('popupColors', {
 		background: '#FFFFFF',
 		text: '#00FF11',
-		opacity: 0.7
+		transparency: 0.3
 	}) as {
 		background: string;
 		text: string;
-		opacity: number;
+		transparency: number;
 	},
 	popupMessage: store.get('popupMessage', 'Blink!') as string,
 	isTracking: false,
@@ -166,6 +166,9 @@ function showStartingPopup() {
 		skipTransformProcessType: true 
 	});
 
+	// Set initial transparency
+	popup.setOpacity(1 - preferences.popupColors.transparency);
+
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "starting.html"));
 	popup.webContents.on('did-finish-load', () => {
@@ -221,6 +224,9 @@ function showBlinkPopup() {
 		visibleOnFullScreen: true,
 		skipTransformProcessType: true 
 	});
+
+	// Set initial transparency
+	popup.setOpacity(1 - preferences.popupColors.transparency);
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "blink.html"));
@@ -286,6 +292,9 @@ function showStoppedPopup() {
 		visibleOnFullScreen: true,
 		skipTransformProcessType: true 
 	});
+
+	// Set initial transparency
+	popup.setOpacity(1 - preferences.popupColors.transparency);
 
 	currentPopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "stopped.html"));
@@ -748,6 +757,31 @@ ipcMain.on("update-interval", (_event, interval: number) => {
 ipcMain.on("update-popup-colors", (_event, colors) => {
 	preferences.popupColors = colors;
 	store.set('popupColors', colors);
+	
+	// Update transparency of current popup if it exists
+	if (currentPopup && !currentPopup.isDestroyed()) {
+		currentPopup.setOpacity(1 - colors.transparency);
+	}
+	
+	// Update transparency of popup editor window if it exists
+	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
+		popupEditorWindow.setOpacity(1 - colors.transparency);
+	}
+});
+
+ipcMain.on("update-popup-transparency", (_event, transparency: number) => {
+	preferences.popupColors.transparency = transparency;
+	store.set('popupColors', preferences.popupColors);
+	
+	// Update transparency of current popup if it exists
+	if (currentPopup && !currentPopup.isDestroyed()) {
+		currentPopup.setOpacity(1 - transparency);
+	}
+	
+	// Update transparency of popup editor window if it exists
+	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
+		popupEditorWindow.setOpacity(1 - transparency);
+	}
 });
 
 ipcMain.on("update-popup-message", (_event, message: string) => {
@@ -1157,6 +1191,9 @@ function showPopupEditor() {
 		skipTransformProcessType: true 
 	});
 
+	// Set initial transparency
+	popupEditorWindow.setOpacity(1 - preferences.popupColors.transparency);
+
 	popupEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "popup-editor.html"));
 	
 	popupEditorWindow.webContents.on('did-finish-load', () => {
@@ -1225,7 +1262,7 @@ ipcMain.on('reset-preferences', () => {
   preferences.popupColors = {
     background: '#FFFFFF',
     text: '#00FF11',
-    opacity: 0.7
+    transparency: 0.3
   };
   preferences.popupMessage = 'Blink!';
   preferences.isTracking = false;

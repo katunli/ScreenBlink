@@ -4,7 +4,7 @@ import { Eye, Camera, Play, Square, Settings, Activity, Clock, Zap, Moon, Sun, P
 interface PopupColors {
   background: string;
   text: string;
-  opacity: number;
+  transparency: number;
 }
 
 interface UserPreferences {
@@ -37,7 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   popupColors: {
     background: '#FFFFFF',
     text: '#00FF40',
-    opacity: 0.7
+    transparency: 0.3
   },
   popupMessage: 'Blink!',
   isTracking: false,
@@ -143,6 +143,7 @@ export default function ScreenBlinkHomepage() {
     window.ipcRenderer?.send('update-eye-exercises-enabled', preferences.eyeExercisesEnabled);
     window.ipcRenderer?.send('update-exercise-interval', preferences.exerciseInterval);
     window.ipcRenderer?.send('update-popup-colors', preferences.popupColors);
+    window.ipcRenderer?.send('update-popup-transparency', preferences.popupColors.transparency);
     window.ipcRenderer?.send('update-popup-message', preferences.popupMessage);
     window.ipcRenderer?.send('update-interval', preferences.reminderInterval * 1000);
     window.ipcRenderer?.send('update-keyboard-shortcut', preferences.keyboardShortcut);
@@ -796,28 +797,28 @@ export default function ScreenBlinkHomepage() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Background Opacity</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Window Transparency</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
                             min="0"
                             max="1"
                             step="0.1"
-                            value={preferences.popupColors.opacity}
+                            value={preferences.popupColors.transparency}
                             onChange={(e) => setPreferences(prev => ({
                               ...prev,
-                              popupColors: { ...prev.popupColors, opacity: parseFloat(e.target.value) }
+                              popupColors: { ...prev.popupColors, transparency: parseFloat(e.target.value) }
                             }))}
                             className="flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
                           />
                           <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
-                            {Math.round(preferences.popupColors.opacity * 100)}%
+                            {Math.round(preferences.popupColors.transparency * 100)}%
                           </span>
                         </div>
                       </div>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      Customize the appearance of the blink reminder popup
+                      Customize the transparency of the entire popup window. Higher values make the window more transparent, allowing you to see through to what's behind it.
                     </p>
                   </div>
                 )}

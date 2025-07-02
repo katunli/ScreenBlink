@@ -45,8 +45,8 @@
     const { ipcRenderer } = require('electron');
     
     function updateColors(colors) {
-      const alpha = Math.round(colors.opacity * 255).toString(16).padStart(2, '0');
-      document.body.style.background = `${colors.background}${alpha}`;
+      // Use solid background color without alpha channel - transparency is handled by window opacity
+      document.body.style.background = colors.background;
       document.getElementById('stopped').style.color = colors.text;
     }
 
@@ -54,7 +54,7 @@
     updateColors({
       background: '#1E1E1E',
       text: '#FFFFFF',
-      opacity: 0.5
+      transparency: 0.3
     });
     
     // Listen for color updates
