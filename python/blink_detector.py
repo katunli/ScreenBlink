@@ -6,7 +6,8 @@ import sys
 import os
 import dlib
 from pathlib import Path
-import select
+import threading
+import queue
 import base64
 
 # Constants
@@ -17,6 +18,7 @@ BLINK_COOLDOWN = 0.5  # seconds
 SEND_VIDEO = False
 CAMERA_ACTIVE = False
 cap = None
+command_queue = queue.Queue()
 
 def calculate_ear(eye_points):
     # Calculate the vertical distances
@@ -34,31 +36,112 @@ def encode_frame(frame):
     # Convert to base64
     return base64.b64encode(buffer).decode('utf-8')
 
+def find_available_camera():
+    """Find the first available camera with detailed debugging"""
+    print(json.dumps({"debug": "Starting camera detection..."}))
+    sys.stdout.flush()
+    
+    # Platform-specific backends
+    if sys.platform == "win32":
+        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+    elif sys.platform == "darwin":
+        backends = [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
+    else:
+        backends = [cv2.CAP_V4L2, cv2.CAP_ANY]
+    
+    for backend in backends:
+        print(json.dumps({"debug": f"Testing backend: {backend}"}))
+        sys.stdout.flush()
+        
+        for i in range(5):  # Check cameras 0-4
+            print(json.dumps({"debug": f"Trying camera index {i} with backend {backend}"}))
+            sys.stdout.flush()
+            
+            try:
+                cap_test = cv2.VideoCapture(i, backend)
+                if cap_test.isOpened():
+                    ret, test_frame = cap_test.read()
+                    cap_test.release()
+                    
+                    if ret and test_frame is not None:
+                        print(json.dumps({"debug": f"Success! Camera {i} working with backend {backend}"}))
+                        print(json.dumps({"status": f"Found working camera at index {i}"}))
+                        sys.stdout.flush()
+                        return i
+                    else:
+                        print(json.dumps({"debug": f"Camera {i} opened but cannot read frames"}))
+                        sys.stdout.flush()
+                else:
+                    print(json.dumps({"debug": f"Failed to open camera {i} with backend {backend}"}))
+                    sys.stdout.flush()
+            except Exception as e:
+                print(json.dumps({"debug": f"Exception testing camera {i} with backend {backend}: {str(e)}"}))
+                sys.stdout.flush()
+    
+    print(json.dumps({"debug": "No working camera found after trying all options"}))
+    sys.stdout.flush()
+    return None
+
 def start_camera():
     """Start the camera and return success status"""
     global cap, CAMERA_ACTIVE
     
+    print(json.dumps({"debug": "start_camera() called"}))
+    sys.stdout.flush()
+    
     if CAMERA_ACTIVE:
+        print(json.dumps({"debug": "Camera already active"}))
+        sys.stdout.flush()
         return True
     
-    # Initialize video capture
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print(json.dumps({"error": "Failed to open camera"}))
+    # Find available camera
+    camera_index = find_available_camera()
+    if camera_index is None:
+        print(json.dumps({"error": "No working camera found"}))
+        sys.stdout.flush()
         return False
     
-    # Set resolution
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    
-    CAMERA_ACTIVE = True
-    print(json.dumps({"status": "Camera opened successfully"}))
-    sys.stdout.flush()
-    return True
+    # Initialize video capture with the working camera
+    try:
+        cap = cv2.VideoCapture(camera_index)
+        
+        # Test if we can actually read frames
+        ret, test_frame = cap.read()
+        if not ret or test_frame is None:
+            print(json.dumps({"error": "Camera opened but cannot read frames"}))
+            sys.stdout.flush()
+            cap.release()
+            return False
+        
+        # Set resolution
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
+        # Verify resolution was set
+        actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        print(json.dumps({"debug": f"Camera resolution set to: {actual_width}x{actual_height}"}))
+        sys.stdout.flush()
+        
+        CAMERA_ACTIVE = True
+        print(json.dumps({"status": "Camera opened successfully"}))
+        sys.stdout.flush()
+        return True
+        
+    except Exception as e:
+        print(json.dumps({"error": f"Exception starting camera: {str(e)}"}))
+        sys.stdout.flush()
+        if cap is not None:
+            cap.release()
+            cap = None
+        return False
 
 def stop_camera():
     """Stop the camera"""
     global cap, CAMERA_ACTIVE
+    
+    print(json.dumps({"debug": "stop_camera() called"}))
+    sys.stdout.flush()
     
     if cap is not None:
         cap.release()
@@ -67,6 +150,61 @@ def stop_camera():
     CAMERA_ACTIVE = False
     print(json.dumps({"status": "Camera released"}))
     sys.stdout.flush()
+
+def input_thread():
+    """Thread to handle stdin input"""
+    print(json.dumps({"debug": "Input thread started"}))
+    sys.stdout.flush()
+    
+    while True:
+        try:
+            line = sys.stdin.readline()
+            if line:
+                command_queue.put(line.strip())
+                print(json.dumps({"debug": f"Received command: {line.strip()}"}))
+                sys.stdout.flush()
+        except Exception as e:
+            print(json.dumps({"debug": f"Input thread error: {str(e)}"}))
+            sys.stdout.flush()
+            break
+
+def process_commands():
+    """Process commands from the queue"""
+    global SEND_VIDEO, current_ear_threshold
+    
+    while not command_queue.empty():
+        try:
+            line = command_queue.get_nowait()
+            data = json.loads(line)
+            
+            print(json.dumps({"debug": f"Processing command: {data}"}))
+            sys.stdout.flush()
+            
+            if 'ear_threshold' in data:
+                current_ear_threshold = float(data['ear_threshold'])
+                print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
+                sys.stdout.flush()
+            elif 'request_video' in data:
+                SEND_VIDEO = True
+                print(json.dumps({"status": "Video streaming enabled"}))
+                sys.stdout.flush()
+            elif 'start_camera' in data:
+                if start_camera():
+                    print(json.dumps({"status": "Camera started successfully"}))
+                else:
+                    print(json.dumps({"error": "Failed to start camera"}))
+                sys.stdout.flush()
+            elif 'stop_camera' in data:
+                stop_camera()
+                SEND_VIDEO = False
+                print(json.dumps({"status": "Camera stopped"}))
+                sys.stdout.flush()
+        except json.JSONDecodeError as e:
+            print(json.dumps({"debug": f"JSON decode error: {str(e)}"}))
+            sys.stdout.flush()
+        except Exception as e:
+            print(json.dumps({"debug": f"Command processing error: {str(e)}"}))
+            sys.stdout.flush()
 
 def main():
     global SEND_VIDEO, CAMERA_ACTIVE, cap
@@ -101,38 +239,14 @@ def main():
     current_ear_threshold = EAR_THRESHOLD
     frame_count = 0
     
+    # Start input thread
+    input_handler = threading.Thread(target=input_thread, daemon=True)
+    input_handler.start()
+    
     try:
         while True:
-            # Check for commands from stdin
-            if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                try:
-                    line = sys.stdin.readline()
-                    if line:
-                        data = json.loads(line)
-                        if 'ear_threshold' in data:
-                            current_ear_threshold = float(data['ear_threshold'])
-                            print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
-                            sys.stdout.flush()
-                        elif 'request_video' in data:
-                            SEND_VIDEO = True
-                            print(json.dumps({"status": "Video streaming enabled"}))
-                            sys.stdout.flush()
-                        elif 'start_camera' in data:
-                            if start_camera():
-                                print(json.dumps({"status": "Camera started successfully"}))
-                            else:
-                                print(json.dumps({"error": "Failed to start camera"}))
-                            sys.stdout.flush()
-                        elif 'stop_camera' in data:
-                            stop_camera()
-                            SEND_VIDEO = False
-                            print(json.dumps({"status": "Camera stopped"}))
-                            sys.stdout.flush()
-                except json.JSONDecodeError:
-                    pass
-                except Exception as e:
-                    print(json.dumps({"error": f"Error processing input: {str(e)}"}))
-                    sys.stdout.flush()
+            # Process any pending commands
+            process_commands()
             
             # Only process frames if camera is active
             if not CAMERA_ACTIVE or cap is None:

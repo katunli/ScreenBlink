@@ -74,6 +74,7 @@ export default function ScreenBlinkHomepage() {
   const [isCameraWindowOpen, setIsCameraWindowOpen] = useState(false);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
   const [tempMessage, setTempMessage] = useState('');
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Load preferences from main process
   useEffect(() => {
@@ -89,6 +90,25 @@ export default function ScreenBlinkHomepage() {
     // Cleanup
     return () => {
       window.ipcRenderer?.off('load-preferences', handlePreferences);
+    };
+  }, []);
+
+  // Handle camera errors
+  useEffect(() => {
+    const handleCameraError = (_event: any, error: string) => {
+      console.error('Camera error:', error);
+      setCameraError(error);
+      
+      // Clear error after 10 seconds
+      setTimeout(() => {
+        setCameraError(null);
+      }, 10000);
+    };
+
+    window.ipcRenderer?.on('camera-error', handleCameraError);
+    
+    return () => {
+      window.ipcRenderer?.off('camera-error', handleCameraError);
     };
   }, []);
 
@@ -225,6 +245,25 @@ export default function ScreenBlinkHomepage() {
           </div>
           <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-4">Keep your eyes healthy with smart blink reminders</p>
         </div>
+
+        {/* Camera Error Banner */}
+        {cameraError && (
+          <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mx-4 mt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4" />
+                <span className="font-medium">Camera Error:</span>
+                <span>{cameraError}</span>
+              </div>
+              <button
+                onClick={() => setCameraError(null)}
+                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main Control Panel */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-6">

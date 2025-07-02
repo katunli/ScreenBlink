@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor } from "electron";
+import { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor, systemPreferences } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -435,6 +435,28 @@ function showCameraWindow() {
 	});
 }
 
+// Add camera permission check function
+async function checkAndRequestCameraPermission() {
+	if (process.platform === 'darwin') {
+		try {
+			const cameraAccess = systemPreferences.getMediaAccessStatus('camera');
+			console.log('Camera access status:', cameraAccess);
+			
+			if (cameraAccess !== 'granted') {
+				console.log('Requesting camera access...');
+				const granted = await systemPreferences.askForMediaAccess('camera');
+				console.log('Camera access granted:', granted);
+				return granted;
+			}
+			return true;
+		} catch (error) {
+			console.error('Error checking camera permissions:', error);
+			return false;
+		}
+	}
+	return true; // On non-macOS platforms, assume permission is available
+}
+
 function startBlinkDetector() {
 	if (isBlinkDetectorRunning) return;
 	
@@ -452,6 +474,7 @@ function startBlinkDetector() {
 		return;
 	}
 
+	console.log('Starting blink detector process:', executablePath);
 	blinkDetectorProcess = spawn(executablePath, [], {
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
@@ -468,6 +491,12 @@ function startBlinkDetector() {
 			
 			try {
 				const parsed = JSON.parse(message);
+				
+				// Log all debug messages to console
+				if (parsed.debug) {
+					console.log('Blink detector debug:', parsed.debug);
+				}
+				
 				if (parsed.blink) {
 					frameCount++;
 					if (frameCount % FRAME_SKIP !== 0) {
@@ -485,9 +514,11 @@ function startBlinkDetector() {
 					}
 				} else if (parsed.error) {
 					console.error('Blink detector error:', parsed.error);
+					// Send error to renderer for display in dev tools
+					win?.webContents.send('camera-error', parsed.error);
 					stopBlinkDetector();
 				} else if (parsed.status) {
-					console.log('Blink detector status:', parsed);
+					console.log('Blink detector status:', parsed.status);
 					// If the process is ready, send the initial sensitivity value
 					if (parsed.status === "Models loaded successfully, ready for camera activation" && blinkDetectorProcess.stdin) {
 						// Send initial configuration
@@ -517,10 +548,20 @@ function startBlinkDetector() {
 
 	blinkDetectorProcess.stderr.on('data', (data: Buffer) => {
 		console.error('Blink detector stderr:', data.toString());
+		// Send stderr to renderer for debugging
+		win?.webContents.send('camera-error', `Stderr: ${data.toString()}`);
 	});
 
 	blinkDetectorProcess.on('close', (code: number) => {
 		console.log('Blink detector process exited with code:', code);
+		isBlinkDetectorRunning = false;
+		blinkDetectorProcess = null;
+		isCameraReady = false;
+	});
+
+	blinkDetectorProcess.on('error', (error: Error) => {
+		console.error('Blink detector process error:', error);
+		win?.webContents.send('camera-error', `Process error: ${error.message}`);
 		isBlinkDetectorRunning = false;
 		blinkDetectorProcess = null;
 		isCameraReady = false;
@@ -562,9 +603,17 @@ function stopCamera() {
 	isCameraReady = false;
 }
 
-function startCameraMonitoring() {
+async function startCameraMonitoring() {
 	if (cameraMonitoringInterval) {
 		clearInterval(cameraMonitoringInterval);
+	}
+	
+	// Check camera permissions first
+	const hasPermission = await checkAndRequestCameraPermission();
+	if (!hasPermission) {
+		console.error('Camera permission denied');
+		win?.webContents.send('camera-error', 'Camera permission denied. Please grant camera access in System Preferences.');
+		return;
 	}
 	
 	// Don't set lastBlinkTime yet - wait for camera to be ready and detect first blink
@@ -644,6 +693,7 @@ function startCameraMonitoring() {
 		}, 100); // Check every 100ms for camera readiness
 	} else {
 		console.error('Failed to start camera');
+		win?.webContents.send('camera-error', 'Failed to start camera. Check console for details.');
 	}
 }
 
