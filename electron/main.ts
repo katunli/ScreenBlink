@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor, systemPreferences } from "electron";
+import { app, BrowserWindow, ipcMain, screen, globalShortcut, powerMonitor } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -17,8 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
 const store = new Store();
 
-// The built directory structure
-//
+// Built directory structure
 // ├─┬─┬ dist
 // │ │ └── index.html
 // │ │
@@ -28,7 +27,7 @@ const store = new Store();
 // │
 process.env.APP_ROOT = path.join(__dirname, "..");
 
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
+// Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
@@ -44,10 +43,12 @@ let blinkIntervalId: NodeJS.Timeout | null = null;
 let blinkReminderActive = false;
 let currentPopup: BrowserWindow | null = null;
 
-// Camera-based blink detection state
+// Camera detection state
 let lastBlinkTime = Date.now();
 let cameraMonitoringInterval: NodeJS.Timeout | null = null;
-let isCameraReady = false; // Add flag to track when camera is ready
+let isCameraReady = false;
+let cameraRetryCount = 0;
+const MAX_CAMERA_RETRIES = 20; // Max retries (20 * 3s = 1 minute)
 
 let blinkDetectorProcess: any = null;
 let isBlinkDetectorRunning = false;
@@ -57,7 +58,7 @@ let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
 let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
 let frameCount = 0;
-const FRAME_SKIP = 1; // Process every 2nd frame (changed from 3 to 1)
+const FRAME_SKIP = 3; // Process every 3rd frame
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
 
@@ -72,7 +73,7 @@ const preferences = {
 	reminderInterval: store.get('reminderInterval', 5000) as number,
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
-	exerciseInterval: store.get('exerciseInterval', 20) as number, // Exercise interval in minutes
+	exerciseInterval: store.get('exerciseInterval', 20) as number, // minutes
 	popupPosition: store.get('popupPosition', { x: 40, y: 40 }) as { x: number, y: number },
 	popupSize: store.get('popupSize', { width: 220, height: 80 }) as { width: number, height: number },
 	popupColors: store.get('popupColors', {
@@ -106,20 +107,19 @@ function createWindow() {
 		},
 	});
 
-	// Test active push message to Renderer-process.
+	// Send initial message to renderer
 	win.webContents.on("did-finish-load", () => {
 		win?.webContents.send("main-process-message", new Date().toLocaleString());
-		// Send initial preferences to renderer
+		// Send initial preferences
 		win?.webContents.send("load-preferences", {
 			...preferences,
-			reminderInterval: preferences.reminderInterval / 1000 // Convert to seconds for the UI
+			reminderInterval: preferences.reminderInterval / 1000
 		});
 	});
 
 	if (VITE_DEV_SERVER_URL) {
 		win.loadURL(VITE_DEV_SERVER_URL);
 	} else {
-		// win.loadFile('dist/index.html')
 		win.loadFile(path.join(RENDERER_DIST, "index.html"));
 	}
 }
@@ -147,26 +147,23 @@ function showStartingPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Enable floating on top of full-screened apps on macOS
+		type: 'panel', // Float on top of fullscreen apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
 		},
 	});
 
-	// Set window level to stay on top of fullscreen applications
-	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	// Set window level to stay on top
 	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
 	popup.setAlwaysOnTop(true, level);
 	
-	// Make popup visible on all workspaces and fullscreen applications
-	// Use skipTransformProcessType to prevent dock hiding
+	// Make popup visible on all workspaces
 	popup.setVisibleOnAllWorkspaces(true, { 
 		visibleOnFullScreen: true,
 		skipTransformProcessType: true 
 	});
 
-	// Set initial transparency
 	popup.setOpacity(1 - preferences.popupColors.transparency);
 
 	currentPopup = popup;
@@ -206,26 +203,23 @@ function showBlinkPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Enable floating on top of full-screened apps on macOS
+		type: 'panel', // Float on top of fullscreen apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
 		},
 	});
 
-	// Set window level to stay on top of fullscreen applications
-	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	// Set window level to stay on top
 	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
 	popup.setAlwaysOnTop(true, level);
 	
-	// Make popup visible on all workspaces and fullscreen applications
-	// Use skipTransformProcessType to prevent dock hiding
+	// Make popup visible on all workspaces
 	popup.setVisibleOnAllWorkspaces(true, { 
 		visibleOnFullScreen: true,
 		skipTransformProcessType: true 
 	});
 
-	// Set initial transparency
 	popup.setOpacity(1 - preferences.popupColors.transparency);
 
 	currentPopup = popup;
@@ -240,7 +234,7 @@ function showBlinkPopup() {
 		popup.showInactive();
 	});
 
-	// Only auto-close if camera is not enabled
+	// Auto-close if camera is not enabled
 	if (!preferences.cameraEnabled) {
 		setTimeout(() => {
 			if (currentPopup === popup) {
@@ -274,26 +268,23 @@ function showStoppedPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Enable floating on top of full-screened apps on macOS
+		type: 'panel', // Float on top of fullscreen apps on macOS
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
 		},
 	});
 
-	// Set window level to stay on top of fullscreen applications
-	// Use 'floating' for macOS and 'screen-saver' for other platforms
+	// Set window level to stay on top
 	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
 	popup.setAlwaysOnTop(true, level);
 	
-	// Make popup visible on all workspaces and fullscreen applications
-	// Use skipTransformProcessType to prevent dock hiding
+	// Make popup visible on all workspaces
 	popup.setVisibleOnAllWorkspaces(true, { 
 		visibleOnFullScreen: true,
 		skipTransformProcessType: true 
 	});
 
-	// Set initial transparency
 	popup.setOpacity(1 - preferences.popupColors.transparency);
 
 	currentPopup = popup;
@@ -306,7 +297,7 @@ function showStoppedPopup() {
 		popup.showInactive();
 	});
 	
-	// Auto-close the stopped popup after 2.5 seconds
+	// Auto-close after 2.5 seconds
 	setTimeout(() => {
 		if (currentPopup === popup) {
 			popup.close();
@@ -337,7 +328,7 @@ function startBlinkReminderLoop(interval: number) {
 		if (blinkReminderActive) {
 			showBlinkPopup();
 		}
-	}, preferences.reminderInterval + 2500); // Add 2.5s to account for popup fade out
+	}, preferences.reminderInterval + 2500); // Add 2.5s for popup fade out
 }
 
 function stopBlinkReminderLoop() {
@@ -364,6 +355,9 @@ function stopBlinkReminderLoop() {
 		// Notify renderer to stop camera
 		win?.webContents.send('stop-camera');
 	}
+	
+	// Reset camera retry counter when stopping
+	cameraRetryCount = 0;
 }
 
 function registerGlobalShortcut(shortcut: string) {
@@ -382,7 +376,7 @@ function registerGlobalShortcut(shortcut: string) {
 			}
 			preferences.isTracking = true;
 			if (preferences.cameraEnabled) {
-				// Start camera monitoring (lastBlinkTime will be set when camera is ready)
+				// Start camera monitoring
 				startCameraMonitoring();
 			} else {
 				startBlinkReminderLoop(preferences.reminderInterval);
@@ -444,27 +438,6 @@ function showCameraWindow() {
 	});
 }
 
-// Add camera permission check function
-async function checkAndRequestCameraPermission() {
-	if (process.platform === 'darwin') {
-		try {
-			const cameraAccess = systemPreferences.getMediaAccessStatus('camera');
-			console.log('Camera access status:', cameraAccess);
-			
-			if (cameraAccess !== 'granted') {
-				console.log('Requesting camera access...');
-				const granted = await systemPreferences.askForMediaAccess('camera');
-				console.log('Camera access granted:', granted);
-				return granted;
-			}
-			return true;
-		} catch (error) {
-			console.error('Error checking camera permissions:', error);
-			return false;
-		}
-	}
-	return true; // On non-macOS platforms, assume permission is available
-}
 
 function startBlinkDetector() {
 	if (isBlinkDetectorRunning) return;
@@ -525,7 +498,32 @@ function startBlinkDetector() {
 					console.error('Blink detector error:', parsed.error);
 					// Send error to renderer for display in dev tools
 					win?.webContents.send('camera-error', parsed.error);
-					stopBlinkDetector();
+					
+					// Don't stop the blink detector process on camera errors
+					// Instead, just mark camera as not ready and let the retry mechanism handle it
+					isCameraReady = false;
+					
+					// If this is a camera-related error and we're tracking, try to restart camera after a delay
+					if (preferences.isTracking && preferences.cameraEnabled && 
+						(parsed.error.includes('camera') || parsed.error.includes('permission') || parsed.error.includes('access'))) {
+						
+						cameraRetryCount++;
+						
+						if (cameraRetryCount <= MAX_CAMERA_RETRIES) {
+							console.log(`Camera error detected, retry ${cameraRetryCount}/${MAX_CAMERA_RETRIES} in 3 seconds...`);
+							setTimeout(() => {
+								if (preferences.isTracking && preferences.cameraEnabled && isBlinkDetectorRunning) {
+									console.log('Retrying camera start after error...');
+									startCamera();
+								}
+							}, 3000);
+						} else {
+							console.error('Max camera retries reached, stopping attempts');
+							win?.webContents.send('camera-error', 'Camera access failed after multiple attempts. Please check camera permissions and restart tracking.');
+							// Reset retry count for next time
+							cameraRetryCount = 0;
+						}
+					}
 				} else if (parsed.status) {
 					console.log('Blink detector status:', parsed.status);
 					// If the process is ready, send the initial sensitivity value
@@ -537,6 +535,8 @@ function startBlinkDetector() {
 						}) + '\n');
 					} else if (parsed.status === "Camera opened successfully" && blinkDetectorProcess.stdin) {
 						isCameraReady = true; // Set camera ready flag
+						cameraRetryCount = 0; // Reset retry counter on successful camera start
+						console.log('Camera started successfully, resetting retry counter');
 					}
 				} else if (parsed.faceData) {
 					// Send face tracking data to camera window
@@ -617,17 +617,18 @@ async function startCameraMonitoring() {
 		clearInterval(cameraMonitoringInterval);
 	}
 	
-	// Check camera permissions first
-	const hasPermission = await checkAndRequestCameraPermission();
-	if (!hasPermission) {
-		console.error('Camera permission denied');
-		win?.webContents.send('camera-error', 'Camera permission denied. Please grant camera access in System Preferences.');
-		return;
-	}
+	// Remove camera permission check - let the Python process handle it
+	// const hasPermission = await checkAndRequestCameraPermission();
+	// if (!hasPermission) {
+	// 	console.error('Camera permission denied');
+	// 	win?.webContents.send('camera-error', 'Camera permission denied. Please grant camera access in System Preferences.');
+	// 	return;
+	// }
 	
 	// Don't set lastBlinkTime yet - wait for camera to be ready and detect first blink
 	frameCount = 0;
 	isCameraReady = false; // Reset camera ready flag
+	cameraRetryCount = 0; // Reset retry counter for new tracking session
 	
 	// Show "Starting" popup immediately when tracking starts
 	showStartingPopup();
@@ -673,7 +674,7 @@ async function startCameraMonitoring() {
 						if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
 							showBlinkPopup();
 						}
-					}, preferences.reminderInterval + 2500); // Add 2.5s to account for popup fade out
+					}, preferences.reminderInterval + 2500); // Add 2.5s for popup fade out
 				} else {
 					// Normal mode - only show popup if no blink detected
 					cameraMonitoringInterval = setInterval(() => {
@@ -701,8 +702,9 @@ async function startCameraMonitoring() {
 			}
 		}, 100); // Check every 100ms for camera readiness
 	} else {
-		console.error('Failed to start camera');
-		win?.webContents.send('camera-error', 'Failed to start camera. Check console for details.');
+		console.error('Failed to start camera initially, but will keep trying...');
+		// Don't send error immediately, let the retry mechanism handle it
+		// The Python process will retry internally, and we'll retry from the error handler
 	}
 }
 

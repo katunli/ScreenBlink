@@ -1,6 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
-// --------- Expose some API to the Renderer process ---------
+// Expose API to the Renderer process
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on: (channel: string, func: (...args: any[]) => void) => {
     const validChannels = [

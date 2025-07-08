@@ -94,47 +94,77 @@ def start_camera():
         sys.stdout.flush()
         return True
     
-    # Find available camera
-    camera_index = find_available_camera()
-    if camera_index is None:
-        print(json.dumps({"error": "No working camera found"}))
-        sys.stdout.flush()
-        return False
+    # Try to start camera with retry logic
+    max_retries = 10  # Try up to 10 times
+    retry_delay = 2   # Wait 2 seconds between retries
     
-    # Initialize video capture with the working camera
-    try:
-        cap = cv2.VideoCapture(camera_index)
+    for attempt in range(max_retries):
+        print(json.dumps({"debug": f"Camera start attempt {attempt + 1}/{max_retries}"}))
+        sys.stdout.flush()
         
-        # Test if we can actually read frames
-        ret, test_frame = cap.read()
-        if not ret or test_frame is None:
-            print(json.dumps({"error": "Camera opened but cannot read frames"}))
+        # Find available camera
+        camera_index = find_available_camera()
+        if camera_index is None:
+            print(json.dumps({"debug": f"No working camera found on attempt {attempt + 1}"}))
             sys.stdout.flush()
-            cap.release()
-            return False
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                print(json.dumps({"error": "No working camera found after all attempts"}))
+                sys.stdout.flush()
+                return False
         
-        # Set resolution
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        
-        # Verify resolution was set
-        actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        print(json.dumps({"debug": f"Camera resolution set to: {actual_width}x{actual_height}"}))
-        sys.stdout.flush()
-        
-        CAMERA_ACTIVE = True
-        print(json.dumps({"status": "Camera opened successfully"}))
-        sys.stdout.flush()
-        return True
-        
-    except Exception as e:
-        print(json.dumps({"error": f"Exception starting camera: {str(e)}"}))
-        sys.stdout.flush()
-        if cap is not None:
-            cap.release()
-            cap = None
-        return False
+        # Initialize video capture with the working camera
+        try:
+            cap = cv2.VideoCapture(camera_index)
+            
+            # Test if we can actually read frames
+            ret, test_frame = cap.read()
+            if not ret or test_frame is None:
+                print(json.dumps({"debug": f"Camera opened but cannot read frames on attempt {attempt + 1}"}))
+                sys.stdout.flush()
+                cap.release()
+                cap = None
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    print(json.dumps({"error": "Camera opened but cannot read frames after all attempts"}))
+                    sys.stdout.flush()
+                    return False
+            
+            # Set resolution
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            
+            # Verify resolution was set
+            actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            print(json.dumps({"debug": f"Camera resolution set to: {actual_width}x{actual_height}"}))
+            sys.stdout.flush()
+            
+            CAMERA_ACTIVE = True
+            print(json.dumps({"status": "Camera opened successfully"}))
+            sys.stdout.flush()
+            return True
+            
+        except Exception as e:
+            print(json.dumps({"debug": f"Exception starting camera on attempt {attempt + 1}: {str(e)}"}))
+            sys.stdout.flush()
+            if cap is not None:
+                cap.release()
+                cap = None
+            
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                print(json.dumps({"error": f"Failed to start camera after all attempts: {str(e)}"}))
+                sys.stdout.flush()
+                return False
+    
+    return False
 
 def stop_camera():
     """Stop the camera"""
