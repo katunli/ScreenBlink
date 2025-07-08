@@ -36,7 +36,7 @@ def test_binary():
         print("OK: Binary started successfully")
         
         # Send a test configuration
-        test_config = {"ear_threshold": 0.25}
+        test_config = {"ear_threshold": 0.20}
         process.stdin.write(json.dumps(test_config) + "\n")
         process.stdin.flush()
         

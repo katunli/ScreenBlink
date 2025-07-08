@@ -11,11 +11,11 @@ import queue
 import base64
 
 # Constants
-EAR_THRESHOLD = 0.25  # Default value
+EAR_THRESHOLD = 0.20  # Default value
 BLINK_COOLDOWN = 0.5  # seconds
-TARGET_FPS = 10  # Limit processing to 10 FPS for better performance
+TARGET_FPS = 10  # Fixed efficient FPS
 FACE_DETECTION_SKIP = 3  # Only run face detection every 3rd frame
-PROCESSING_RESOLUTION = (320, 240)  # Process at lower resolution for speed
+PROCESSING_RESOLUTION = (320, 240)  # Fixed efficient resolution
 
 # Global variables
 SEND_VIDEO = False
@@ -25,6 +25,7 @@ command_queue = queue.Queue()
 current_face_detection_skip = FACE_DETECTION_SKIP
 target_fps = TARGET_FPS
 processing_resolution = PROCESSING_RESOLUTION
+current_ear_threshold = EAR_THRESHOLD 
 
 def calculate_ear(eye_points):
     # Calculate the vertical distances
@@ -102,9 +103,8 @@ def start_camera():
         return True
     
     # Try to start camera with retry logic
-    max_retries = 10  # Try up to 10 times
-    retry_delay = 2   # Wait 2 seconds between retries
-    
+    max_retries = 10  
+    retry_delay = 2   
     for attempt in range(max_retries):
         print(json.dumps({"debug": f"Camera start attempt {attempt + 1}/{max_retries}"}))
         sys.stdout.flush()
@@ -141,11 +141,11 @@ def start_camera():
                     sys.stdout.flush()
                     return False
             
-            # Set resolution
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            # Set resolution to efficient processing resolution
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, processing_resolution[0])
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, processing_resolution[1])
             
-            # Set frame rate to reduce CPU usage
+            # Set frame rate to efficient target FPS
             cap.set(cv2.CAP_PROP_FPS, target_fps)
             
             # Verify resolution was set
@@ -211,7 +211,7 @@ def input_thread():
 
 def process_commands():
     """Process commands from the queue"""
-    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip, target_fps, processing_resolution
+    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip
     
     while not command_queue.empty():
         try:
@@ -224,20 +224,11 @@ def process_commands():
             if 'ear_threshold' in data:
                 current_ear_threshold = float(data['ear_threshold'])
                 print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
+                print(json.dumps({"debug": f"Current EAR threshold being used: {current_ear_threshold}"}))
                 sys.stdout.flush()
             elif 'frame_skip' in data:
                 current_face_detection_skip = int(data['frame_skip'])
                 print(json.dumps({"status": f"Updated face detection skip to {current_face_detection_skip}"}))
-                sys.stdout.flush()
-            elif 'target_fps' in data:
-                target_fps = int(data['target_fps'])
-                if CAMERA_ACTIVE and cap is not None:
-                    cap.set(cv2.CAP_PROP_FPS, target_fps)
-                print(json.dumps({"status": f"Updated target FPS to {target_fps}"}))
-                sys.stdout.flush()
-            elif 'processing_resolution' in data:
-                processing_resolution = tuple(data['processing_resolution'])
-                print(json.dumps({"status": f"Updated processing resolution to {processing_resolution}"}))
                 sys.stdout.flush()
             elif 'request_video' in data:
                 SEND_VIDEO = True
@@ -262,7 +253,7 @@ def process_commands():
             sys.stdout.flush()
 
 def main():
-    global SEND_VIDEO, CAMERA_ACTIVE, cap
+    global SEND_VIDEO, CAMERA_ACTIVE, cap, current_ear_threshold  # Add current_ear_threshold to global declaration
     
     print(json.dumps({"status": "Starting blink detector in standby mode..."}))
     sys.stdout.flush()
@@ -288,10 +279,10 @@ def main():
     predictor = dlib.shape_predictor(predictor_path)
     
     print(json.dumps({"status": "Models loaded successfully, ready for camera activation"}))
+    print(json.dumps({"debug": f"Initial EAR threshold set to: {current_ear_threshold}"}))
     sys.stdout.flush()
     
     last_blink_time = time.time()
-    current_ear_threshold = EAR_THRESHOLD
     frame_count = 0
     last_face_detection_time = 0
     cached_face_data = None
