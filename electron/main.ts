@@ -481,10 +481,6 @@ function startBlinkDetector() {
 				}
 				
 				if (parsed.blink) {
-					frameCount++;
-					if (frameCount % FRAME_SKIP !== 0) {
-						continue;
-					}
 					lastBlinkTime = Date.now();
 					try {
 						if (currentPopup && !currentPopup.isDestroyed()) {
@@ -715,17 +711,16 @@ async function startCameraMonitoring() {
 ipcMain.on("blink-detected", () => {
 	lastBlinkTime = Date.now();
 	
-	// Only close popup in normal mode (not MGD mode)
-	if (!preferences.mgdMode) {
-		try {
-			if (currentPopup && !currentPopup.isDestroyed()) {
-				currentPopup.close();
-				currentPopup = null;
-			}
-		} catch (error) {
-			console.log('Popup already destroyed');
+	// Close popup in both normal and MGD modes
+	// The Python process now handles frame skipping internally
+	try {
+		if (currentPopup && !currentPopup.isDestroyed()) {
+			currentPopup.close();
 			currentPopup = null;
 		}
+	} catch (error) {
+		console.log('Popup already destroyed');
+		currentPopup = null;
 	}
 });
 
