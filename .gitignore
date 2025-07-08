@@ -58,3 +58,7 @@ env.bak/
 venv.bak/
 
 # Model files
+
+# Blink detector binary (built during CI)
+electron/resources/blink_detector
+electron/resources/blink_detector.exe
