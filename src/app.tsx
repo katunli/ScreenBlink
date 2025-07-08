@@ -42,7 +42,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   popupMessage: 'Blink!',
   isTracking: false,
   keyboardShortcut: 'Ctrl+I',
-  blinkSensitivity: 0.22,
+  blinkSensitivity: 0.20,
   mgdMode: false,
   showMgdInfo: false,
   showPopupColors: false,
@@ -460,7 +460,7 @@ export default function ScreenBlinkHomepage() {
                       </div>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                      Set your eye size threshold for blink detection. When your eye size goes below this value, a blink will be detected. Lower values require more pronounced blinks to be detected, while higher values are more sensitive. Start reminders, then test by clicking "Show Camera" and blinking.
+                      Set your eye size threshold for blink detection. Lower values are less sensitive and need more pronounced blinks, higher values are more sensitive. Recommended values are between 0.20 and 0.25.
                     </p>
                   </div>
 

@@ -57,7 +57,6 @@ let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
 let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
-let frameCount = 0;
 const FRAME_SKIP = 3; // Process every 3rd frame
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
@@ -90,8 +89,7 @@ const preferences = {
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
 	mgdMode: store.get('mgdMode', false) as boolean,
-	soundEnabled: store.get('soundEnabled', false) as boolean,
-	performanceMode: store.get('performanceMode', true) as boolean
+	soundEnabled: store.get('soundEnabled', false) as boolean
 };
 
 function createWindow() {
@@ -529,8 +527,8 @@ function startBlinkDetector() {
 						const config = {
 							ear_threshold: preferences.blinkSensitivity,
 							frame_skip: FRAME_SKIP,
-							target_fps: preferences.performanceMode ? 10 : 15,
-							processing_resolution: preferences.performanceMode ? [320, 240] : [480, 360]
+							target_fps: 10, // Fixed for efficiency
+							processing_resolution: [320, 240] // Fixed for efficiency
 						};
 						blinkDetectorProcess.stdin.write(JSON.stringify(config) + '\n');
 					} else if (parsed.status === "Camera opened successfully" && blinkDetectorProcess.stdin) {
@@ -616,17 +614,6 @@ async function startCameraMonitoring() {
 	if (cameraMonitoringInterval) {
 		clearInterval(cameraMonitoringInterval);
 	}
-	
-	// Remove camera permission check - let the Python process handle it
-	// const hasPermission = await checkAndRequestCameraPermission();
-	// if (!hasPermission) {
-	// 	console.error('Camera permission denied');
-	// 	win?.webContents.send('camera-error', 'Camera permission denied. Please grant camera access in System Preferences.');
-	// 	return;
-	// }
-	
-	// Don't set lastBlinkTime yet - wait for camera to be ready and detect first blink
-	frameCount = 0;
 	isCameraReady = false; // Reset camera ready flag
 	cameraRetryCount = 0; // Reset retry counter for new tracking session
 	
@@ -1033,19 +1020,7 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 });
 
 // Add IPC handler for performance mode
-ipcMain.on("update-performance-mode", (_event, enabled: boolean) => {
-	preferences.performanceMode = enabled;
-	store.set('performanceMode', enabled);
-	
-	// Update blink detector configuration if it's running
-	if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
-		const config = {
-			target_fps: enabled ? 10 : 15,
-			processing_resolution: enabled ? [320, 240] : [480, 360]
-		};
-		blinkDetectorProcess.stdin.write(JSON.stringify(config) + '\n');
-	}
-});
+// Removed as performance mode is no longer configurable - using fixed efficient values
 
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
@@ -1286,7 +1261,6 @@ ipcMain.on('reset-preferences', () => {
   preferences.blinkSensitivity = 0.20;
   preferences.mgdMode = false;
   preferences.soundEnabled = false;
-  preferences.performanceMode = true;
   
   // Re-register the default keyboard shortcut
   registerGlobalShortcut(preferences.keyboardShortcut);
