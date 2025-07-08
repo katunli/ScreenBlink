@@ -338,30 +338,16 @@ def main():
             should_detect_face = (frame_count % current_face_detection_skip == 0)
             
             if should_detect_face:
-                # Optimize face detection by focusing on center region
-                height, width = gray.shape
-                center_region = gray[max(0, height//4):min(height, 3*height//4), 
-                                   max(0, width//4):min(width, 3*width//4)]
-                
-                # Detect faces using dlib with optimized parameters
+                # Detect faces using dlib on the full frame
                 # Use smaller detection scale for faster processing
-                faces = detector(center_region, 1)  # Scale factor of 1 instead of 0 for speed
+                faces = detector(gray, 1)  # Scale factor of 1 instead of 0 for speed
                 last_face_detection_time = current_time
                 
                 face_data = default_face_data.copy()  # Use pre-allocated structure
                 
                 for face in faces:
-                    # Adjust face coordinates back to full frame
-                    # Create a new rectangle with adjusted coordinates
-                    adjusted_face = dlib.rectangle(
-                        face.left() + width // 4,
-                        face.top() + height // 4,
-                        face.right() + width // 4,
-                        face.bottom() + height // 4
-                    )
-                    
                     # Get facial landmarks
-                    landmarks = predictor(gray, adjusted_face)
+                    landmarks = predictor(gray, face)
                     
                     # Convert landmarks to numpy array
                     points = np.array([[p.x, p.y] for p in landmarks.parts()])
@@ -379,10 +365,10 @@ def main():
                     face_data["faceDetected"] = True
                     face_data["ear"] = avg_ear
                     face_data["faceRect"] = {
-                        "x": adjusted_face.left() / frame.shape[1],
-                        "y": adjusted_face.top() / frame.shape[0],
-                        "width": adjusted_face.width() / frame.shape[1],
-                        "height": adjusted_face.height() / frame.shape[0]
+                        "x": face.left() / frame.shape[1],
+                        "y": face.top() / frame.shape[0],
+                        "width": face.width() / frame.shape[1],
+                        "height": face.height() / frame.shape[0]
                     }
                     face_data["eyeLandmarks"] = [
                         {"x": p[0] / frame.shape[1], "y": p[1] / frame.shape[0]}
@@ -398,6 +384,7 @@ def main():
                             "ear": avg_ear,
                             "time": current_time
                         }))
+                        print(json.dumps({"debug": f"Blink detected! EAR: {avg_ear:.3f}, Threshold: {current_ear_threshold:.3f}"}))
                         sys.stdout.flush()
                 
                 # Cache the face data for frames where we don't detect
