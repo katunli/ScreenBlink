@@ -27,6 +27,32 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Download shape predictor model
+        run: |
+          Write-Host "Downloading shape predictor model..."
+          $modelUrl = "https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
+          $modelDir = "electron/assets/models"
+          $modelPath = "$modelDir/shape_predictor_68_face_landmarks.dat"
+          
+          # Create directory if it doesn't exist
+          New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
+          
+          # Download and extract the model
+          Invoke-WebRequest -Uri $modelUrl -OutFile "$modelPath.bz2"
+          
+          # Extract using PowerShell (if 7zip is available) or use Python
+          try {
+            # Try using 7zip if available
+            & "C:\Program Files\7-Zip\7z.exe" e "$modelPath.bz2" -o"$modelDir" -y
+            Remove-Item "$modelPath.bz2"
+          } catch {
+            Write-Host "7zip not available, using Python to extract..."
+            python -c "import bz2; import shutil; import os; os.makedirs('$modelDir', exist_ok=True); shutil.copyfileobj(bz2.open('$modelPath.bz2', 'rb'), open('$modelPath', 'wb')); os.remove('$modelPath.bz2')"
+          }
+          
+          Write-Host "Model downloaded and extracted successfully!"
+          Write-Host "Model size: $((Get-Item $modelPath).Length / 1MB) MB"
+
       - name: Verify shape predictor file exists
         run: |
           if [ ! -f "electron/assets/models/shape_predictor_68_face_landmarks.dat" ]; then
@@ -176,7 +202,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -191,6 +217,32 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
+      - name: Download shape predictor model
+        run: |
+          Write-Host "Downloading shape predictor model..."
+          $modelUrl = "https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
+          $modelDir = "electron/assets/models"
+          $modelPath = "$modelDir/shape_predictor_68_face_landmarks.dat"
+          
+          # Create directory if it doesn't exist
+          New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
+          
+          # Download and extract the model
+          Invoke-WebRequest -Uri $modelUrl -OutFile "$modelPath.bz2"
+          
+          # Extract using PowerShell (if 7zip is available) or use Python
+          try {
+            # Try using 7zip if available
+            & "C:\Program Files\7-Zip\7z.exe" e "$modelPath.bz2" -o"$modelDir" -y
+            Remove-Item "$modelPath.bz2"
+          } catch {
+            Write-Host "7zip not available, using Python to extract..."
+            python -c "import bz2; import shutil; import os; os.makedirs('$modelDir', exist_ok=True); shutil.copyfileobj(bz2.open('$modelPath.bz2', 'rb'), open('$modelPath', 'wb')); os.remove('$modelPath.bz2')"
+          }
+          
+          Write-Host "Model downloaded and extracted successfully!"
+          Write-Host "Model size: $((Get-Item $modelPath).Length / 1MB) MB"
 
       - name: Verify shape predictor file exists
         run: |
