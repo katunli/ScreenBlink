@@ -90,10 +90,27 @@
 		},
 		"win": {
 			"target": [
-				"nsis",
+				{
+					"target": "nsis",
+					"arch": ["x64"]
+				},
 				"zip"
 			],
-			"icon": "assets/icons/icon.ico"
+			"icon": "assets/icons/icon.ico",
+			"nsis": {
+				"oneClick": false,
+				"allowToChangeInstallationDirectory": true,
+				"createDesktopShortcut": true,
+				"createStartMenuShortcut": true,
+				"shortcutName": "ScreenBlink",
+				"installerIcon": "assets/icons/icon.ico",
+				"uninstallerIcon": "assets/icons/icon.ico",
+				"installerHeaderIcon": "assets/icons/icon.ico",
+				"deleteAppDataOnUninstall": false,
+				"displayLanguageSelector": false,
+				"installerLanguages": ["en-US"],
+				"language": "1033"
+			}
 		}
 	}
 }
