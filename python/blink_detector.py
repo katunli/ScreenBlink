@@ -75,7 +75,7 @@ def find_available_camera():
                         print(json.dumps({"debug": f"Success! Camera {i} working with backend {backend}"}))
                         print(json.dumps({"status": f"Found working camera at index {i}"}))
                         sys.stdout.flush()
-                        return i
+                        return i, backend
                     else:
                         print(json.dumps({"debug": f"Camera {i} opened but cannot read frames"}))
                         sys.stdout.flush()
@@ -88,7 +88,7 @@ def find_available_camera():
     
     print(json.dumps({"debug": "No working camera found after trying all options"}))
     sys.stdout.flush()
-    return None
+    return None, None
 
 def start_camera():
     """Start the camera and return success status"""
@@ -110,7 +110,7 @@ def start_camera():
         sys.stdout.flush()
         
         # Find available camera
-        camera_index = find_available_camera()
+        camera_index, backend = find_available_camera()
         if camera_index is None:
             print(json.dumps({"debug": f"No working camera found on attempt {attempt + 1}"}))
             sys.stdout.flush()
@@ -124,7 +124,7 @@ def start_camera():
         
         # Initialize video capture with the working camera
         try:
-            cap = cv2.VideoCapture(camera_index)
+            cap = cv2.VideoCapture(camera_index, backend)
             
             # Test if we can actually read frames
             ret, test_frame = cap.read()
@@ -211,7 +211,7 @@ def input_thread():
 
 def process_commands():
     """Process commands from the queue"""
-    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip
+    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip, target_fps, processing_resolution
     
     while not command_queue.empty():
         try:
@@ -229,6 +229,16 @@ def process_commands():
             elif 'frame_skip' in data:
                 current_face_detection_skip = int(data['frame_skip'])
                 print(json.dumps({"status": f"Updated face detection skip to {current_face_detection_skip}"}))
+                sys.stdout.flush()
+            elif 'target_fps' in data:
+                target_fps = int(data['target_fps'])
+                if CAMERA_ACTIVE and cap is not None:
+                    cap.set(cv2.CAP_PROP_FPS, target_fps)
+                print(json.dumps({"status": f"Updated target FPS to {target_fps}"}))
+                sys.stdout.flush()
+            elif 'processing_resolution' in data:
+                processing_resolution = tuple(data['processing_resolution'])
+                print(json.dumps({"status": f"Updated processing resolution to {processing_resolution}"}))
                 sys.stdout.flush()
             elif 'request_video' in data:
                 SEND_VIDEO = True
