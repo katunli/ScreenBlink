@@ -1,48 +1,37 @@
 # ScreenBlink
 
-A desktop application to help prevent dry eyes by reminding you to blink regularly.
+A desktop application to help prevent dry eyes by reminding users to blink regularly.
 
 ## Features
 
-- Blink detection using computer vision
-- Customizable reminder intervals
-- Dark mode support
-- Keyboard shortcuts
+- Blink reminders at customizable intervals
+- Camera-based blink detection (optional)
 - Eye exercise reminders
-- Customizable popup appearance
-- Efficient background usage
-
-## Development
-
-The application uses:
-- Electron for the desktop application framework
-- React for the UI
-- Python with dlib for blink detection
-- OpenCV for video processing
+- Customizable popup appearance and position
+- Cross-platform support (Windows, macOS)
 
 ## Installation
 
-Download the latest version on the [website](https://screenblink.vercel.app)
+### Windows
+Download the latest release from the [Releases](https://github.com/katunli/ScreenBlink/releases) page.
 
 ### macOS
-If you encounter a "ScreenBlink.app is damaged and can't be opened" error:
+Download the latest release from the [Releases](https://github.com/katunli/ScreenBlink/releases) page.
 
-You can run this command in Terminal:
-```bash
-xattr -rd com.apple.quarantine /path/to/ScreenBlink.app
-```
+## Development
 
-This is a common issue with unsigned macOS applications and doesn't indicate that the app is actually damaged.
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Git LFS (for model files)
 
-### Windows
-When running the installer or app for the first time, you may see a "Windows protected your PC" warning from SmartScreen. This is normal for unsigned apps.
+### Setup
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Setup Python environment: `cd python && ./setup.sh`
+4. Build Python binary: `cd python && ./build_and_install.sh`
+5. Start development: `npm run dev`
 
-To proceed:
-1. Click **"More info"**
-2. Click **"Run anyway"**
+## Testing LFS Cleanup
 
-This does not mean the app is unsafe; it simply hasn't been code-signed.
-
-## License
-
-MIT
+This commit tests if the LFS cleanup resolved the Windows build issues.
