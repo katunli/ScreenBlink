@@ -13,12 +13,18 @@ import base64
 # Constants
 EAR_THRESHOLD = 0.25  # Default value
 BLINK_COOLDOWN = 0.5  # seconds
+TARGET_FPS = 10  # Limit processing to 10 FPS for better performance
+FACE_DETECTION_SKIP = 3  # Only run face detection every 3rd frame
+PROCESSING_RESOLUTION = (320, 240)  # Process at lower resolution for speed
 
 # Global variables
 SEND_VIDEO = False
 CAMERA_ACTIVE = False
 cap = None
 command_queue = queue.Queue()
+current_face_detection_skip = FACE_DETECTION_SKIP
+target_fps = TARGET_FPS
+processing_resolution = PROCESSING_RESOLUTION
 
 def calculate_ear(eye_points):
     # Calculate the vertical distances
@@ -31,8 +37,9 @@ def calculate_ear(eye_points):
     return ear
 
 def encode_frame(frame):
-    # Encode frame as JPEG
-    _, buffer = cv2.imencode('.jpg', frame)
+    # Encode frame as JPEG with lower quality for better performance
+    encode_params = [cv2.IMWRITE_JPEG_QUALITY, 70]  # Lower quality = faster encoding
+    _, buffer = cv2.imencode('.jpg', frame, encode_params)
     # Convert to base64
     return base64.b64encode(buffer).decode('utf-8')
 
@@ -138,10 +145,14 @@ def start_camera():
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             
+            # Set frame rate to reduce CPU usage
+            cap.set(cv2.CAP_PROP_FPS, target_fps)
+            
             # Verify resolution was set
             actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
             actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            print(json.dumps({"debug": f"Camera resolution set to: {actual_width}x{actual_height}"}))
+            actual_fps = cap.get(cv2.CAP_PROP_FPS)
+            print(json.dumps({"debug": f"Camera resolution set to: {actual_width}x{actual_height}, FPS: {actual_fps}"}))
             sys.stdout.flush()
             
             CAMERA_ACTIVE = True
@@ -200,7 +211,7 @@ def input_thread():
 
 def process_commands():
     """Process commands from the queue"""
-    global SEND_VIDEO, current_ear_threshold
+    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip, target_fps, processing_resolution
     
     while not command_queue.empty():
         try:
@@ -213,6 +224,20 @@ def process_commands():
             if 'ear_threshold' in data:
                 current_ear_threshold = float(data['ear_threshold'])
                 print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
+                sys.stdout.flush()
+            elif 'frame_skip' in data:
+                current_face_detection_skip = int(data['frame_skip'])
+                print(json.dumps({"status": f"Updated face detection skip to {current_face_detection_skip}"}))
+                sys.stdout.flush()
+            elif 'target_fps' in data:
+                target_fps = int(data['target_fps'])
+                if CAMERA_ACTIVE and cap is not None:
+                    cap.set(cv2.CAP_PROP_FPS, target_fps)
+                print(json.dumps({"status": f"Updated target FPS to {target_fps}"}))
+                sys.stdout.flush()
+            elif 'processing_resolution' in data:
+                processing_resolution = tuple(data['processing_resolution'])
+                print(json.dumps({"status": f"Updated processing resolution to {processing_resolution}"}))
                 sys.stdout.flush()
             elif 'request_video' in data:
                 SEND_VIDEO = True
@@ -268,6 +293,21 @@ def main():
     last_blink_time = time.time()
     current_ear_threshold = EAR_THRESHOLD
     frame_count = 0
+    last_face_detection_time = 0
+    cached_face_data = None
+    
+    # Calculate frame interval for target FPS
+    frame_interval = 1.0 / target_fps
+    last_frame_time = time.time()
+    
+    # Pre-allocate face data structure to reduce memory allocations
+    default_face_data = {
+        "faceDetected": False,
+        "ear": 0.0,
+        "blink": False,
+        "faceRect": {"x": 0, "y": 0, "width": 0, "height": 0},
+        "eyeLandmarks": []
+    }
     
     # Start input thread
     input_handler = threading.Thread(target=input_thread, daemon=True)
@@ -283,82 +323,114 @@ def main():
                 time.sleep(0.1)  # Sleep longer when camera is not active
                 continue
             
+            # Frame rate limiting
+            current_time = time.time()
+            if current_time - last_frame_time < frame_interval:
+                time.sleep(0.001)  # Small sleep to prevent busy waiting
+                continue
+            
+            last_frame_time = current_time
+            
             ret, frame = cap.read()
             if not ret:
                 print(json.dumps({"error": "Failed to read frame"}))
                 break
             
+            # Resize frame for faster processing
+            if frame.shape[:2] != processing_resolution[::-1]:  # OpenCV uses (height, width)
+                frame = cv2.resize(frame, processing_resolution)
+            
             # Convert to grayscale for face detection
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
-            # Detect faces using dlib
-            faces = detector(gray, 0)
+            # Only run face detection every N frames to reduce CPU usage
+            should_detect_face = (frame_count % current_face_detection_skip == 0)
             
-            face_data = {
-                "faceDetected": False,
-                "ear": 0.0,
-                "blink": False,
-                "faceRect": {"x": 0, "y": 0, "width": 0, "height": 0},
-                "eyeLandmarks": []
-            }
-            
-            for face in faces:
-                # Get facial landmarks
-                landmarks = predictor(gray, face)
+            if should_detect_face:
+                # Optimize face detection by focusing on center region
+                height, width = gray.shape
+                center_region = gray[max(0, height//4):min(height, 3*height//4), 
+                                   max(0, width//4):min(width, 3*width//4)]
                 
-                # Convert landmarks to numpy array
-                points = np.array([[p.x, p.y] for p in landmarks.parts()])
+                # Detect faces using dlib with optimized parameters
+                # Use smaller detection scale for faster processing
+                faces = detector(center_region, 1)  # Scale factor of 1 instead of 0 for speed
+                last_face_detection_time = current_time
                 
-                # Get eye landmarks
-                left_eye = points[36:42]  # Left eye landmarks
-                right_eye = points[42:48]  # Right eye landmarks
+                face_data = default_face_data.copy()  # Use pre-allocated structure
                 
-                # Calculate EAR for both eyes
-                left_ear = calculate_ear(left_eye)
-                right_ear = calculate_ear(right_eye)
-                avg_ear = (left_ear + right_ear) / 2.0
+                for face in faces:
+                    # Adjust face coordinates back to full frame
+                    # Create a new rectangle with adjusted coordinates
+                    adjusted_face = dlib.rectangle(
+                        face.left() + width // 4,
+                        face.top() + height // 4,
+                        face.right() + width // 4,
+                        face.bottom() + height // 4
+                    )
+                    
+                    # Get facial landmarks
+                    landmarks = predictor(gray, adjusted_face)
+                    
+                    # Convert landmarks to numpy array
+                    points = np.array([[p.x, p.y] for p in landmarks.parts()])
+                    
+                    # Get eye landmarks
+                    left_eye = points[36:42]  # Left eye landmarks
+                    right_eye = points[42:48]  # Right eye landmarks
+                    
+                    # Calculate EAR for both eyes
+                    left_ear = calculate_ear(left_eye)
+                    right_ear = calculate_ear(right_eye)
+                    avg_ear = (left_ear + right_ear) / 2.0
+                    
+                    # Update face data
+                    face_data["faceDetected"] = True
+                    face_data["ear"] = avg_ear
+                    face_data["faceRect"] = {
+                        "x": adjusted_face.left() / frame.shape[1],
+                        "y": adjusted_face.top() / frame.shape[0],
+                        "width": adjusted_face.width() / frame.shape[1],
+                        "height": adjusted_face.height() / frame.shape[0]
+                    }
+                    face_data["eyeLandmarks"] = [
+                        {"x": p[0] / frame.shape[1], "y": p[1] / frame.shape[0]}
+                        for p in np.concatenate([left_eye, right_eye])
+                    ]
+                    
+                    # Check for blink using current threshold
+                    if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
+                        last_blink_time = current_time
+                        face_data["blink"] = True
+                        print(json.dumps({
+                            "blink": True,
+                            "ear": avg_ear,
+                            "time": current_time
+                        }))
+                        sys.stdout.flush()
                 
-                current_time = time.time()
-                
-                # Update face data
-                face_data["faceDetected"] = True
-                face_data["ear"] = avg_ear
-                face_data["faceRect"] = {
-                    "x": face.left() / frame.shape[1],
-                    "y": face.top() / frame.shape[0],
-                    "width": face.width() / frame.shape[1],
-                    "height": face.height() / frame.shape[0]
-                }
-                face_data["eyeLandmarks"] = [
-                    {"x": p[0] / frame.shape[1], "y": p[1] / frame.shape[0]}
-                    for p in np.concatenate([left_eye, right_eye])
-                ]
-                
-                # Check for blink using current threshold
-                if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
-                    last_blink_time = current_time
-                    face_data["blink"] = True
-                    print(json.dumps({
-                        "blink": True,
-                        "ear": avg_ear,
-                        "time": current_time
-                    }))
-                    sys.stdout.flush()
+                # Cache the face data for frames where we don't detect
+                cached_face_data = face_data
+            else:
+                # Use cached face data for frames where we skip detection
+                face_data = cached_face_data if cached_face_data else default_face_data
             
             # Send face tracking data
             print(json.dumps({"faceData": face_data}))
             sys.stdout.flush()
             
-            # Send video frame every 3 frames if enabled
-            if SEND_VIDEO and frame_count % 3 == 0:
-                frame_base64 = encode_frame(frame)
+            # Send video frame every 3 frames if enabled (and only if we have a face)
+            if SEND_VIDEO and frame_count % 3 == 0 and face_data.get("faceDetected", False):
+                # Resize back to original resolution for display if needed
+                display_frame = frame
+                if processing_resolution != (640, 480):
+                    display_frame = cv2.resize(frame, (640, 480))
+                
+                frame_base64 = encode_frame(display_frame)
                 print(json.dumps({"videoStream": frame_base64}))
                 sys.stdout.flush()
             
             frame_count += 1
-            
-            # Small delay to prevent high CPU usage
-            time.sleep(0.01)
             
     except KeyboardInterrupt:
         print(json.dumps({"status": "Stopping blink detector..."}))

@@ -90,7 +90,8 @@ const preferences = {
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
 	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
 	mgdMode: store.get('mgdMode', false) as boolean,
-	soundEnabled: store.get('soundEnabled', false) as boolean
+	soundEnabled: store.get('soundEnabled', false) as boolean,
+	performanceMode: store.get('performanceMode', true) as boolean
 };
 
 function createWindow() {
@@ -528,11 +529,14 @@ function startBlinkDetector() {
 					console.log('Blink detector status:', parsed.status);
 					// If the process is ready, send the initial sensitivity value
 					if (parsed.status === "Models loaded successfully, ready for camera activation" && blinkDetectorProcess.stdin) {
-						// Send initial configuration
-						blinkDetectorProcess.stdin.write(JSON.stringify({ 
+						// Send initial configuration with performance optimizations
+						const config = {
 							ear_threshold: preferences.blinkSensitivity,
-							frame_skip: FRAME_SKIP
-						}) + '\n');
+							frame_skip: FRAME_SKIP,
+							target_fps: preferences.performanceMode ? 10 : 15,
+							processing_resolution: preferences.performanceMode ? [320, 240] : [480, 360]
+						};
+						blinkDetectorProcess.stdin.write(JSON.stringify(config) + '\n');
 					} else if (parsed.status === "Camera opened successfully" && blinkDetectorProcess.stdin) {
 						isCameraReady = true; // Set camera ready flag
 						cameraRetryCount = 0; // Reset retry counter on successful camera start
@@ -1033,6 +1037,21 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 	store.set('soundEnabled', enabled);
 });
 
+// Add IPC handler for performance mode
+ipcMain.on("update-performance-mode", (_event, enabled: boolean) => {
+	preferences.performanceMode = enabled;
+	store.set('performanceMode', enabled);
+	
+	// Update blink detector configuration if it's running
+	if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
+		const config = {
+			target_fps: enabled ? 10 : 15,
+			processing_resolution: enabled ? [320, 240] : [480, 360]
+		};
+		blinkDetectorProcess.stdin.write(JSON.stringify(config) + '\n');
+	}
+});
+
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
 	stopBlinkDetector();
@@ -1272,6 +1291,7 @@ ipcMain.on('reset-preferences', () => {
   preferences.blinkSensitivity = 0.20;
   preferences.mgdMode = false;
   preferences.soundEnabled = false;
+  preferences.performanceMode = true;
   
   // Re-register the default keyboard shortcut
   registerGlobalShortcut(preferences.keyboardShortcut);
