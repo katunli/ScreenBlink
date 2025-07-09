@@ -107,7 +107,7 @@ function createWindow() {
 	});
 
 	// Handle window close event (X button clicked)
-	win.on('close', (event) => {
+	win.on('close', (_event) => {
 		// On Windows, ensure the app quits completely when X is clicked
 		if (process.platform === 'win32') {
 			// Use comprehensive cleanup
