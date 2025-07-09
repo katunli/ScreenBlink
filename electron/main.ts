@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import Store from 'electron-store';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { existsSync } from 'fs';
 
 // Suppress NSWindow panel styleMask warnings on macOS
@@ -584,16 +584,24 @@ function startBlinkDetector() {
 
 function stopBlinkDetector() {
 	if (blinkDetectorProcess) {
-		// On Windows, try to kill the process tree more forcefully
+		// On Windows, use different termination approach
 		if (process.platform === 'win32') {
-			// First try graceful termination
-			blinkDetectorProcess.kill('SIGTERM');
+			// Windows doesn't support SIGTERM/SIGKILL properly
+			// Use the default kill() method which sends CTRL+C equivalent
+			blinkDetectorProcess.kill();
 			
 			// Force kill after a short delay if process doesn't terminate
 			setTimeout(() => {
 				if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
 					try {
-						blinkDetectorProcess.kill('SIGKILL');
+						// Use taskkill to forcefully terminate the process tree on Windows
+						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
+							if (error) {
+								console.error('Failed to force kill blink detector process with taskkill:', error);
+							} else {
+								console.log('Successfully terminated blink detector process with taskkill');
+							}
+						});
 					} catch (error) {
 						console.error('Failed to force kill blink detector process:', error);
 					}
@@ -1060,7 +1068,16 @@ app.on('before-quit', () => {
 process.on('exit', () => {
 	if (blinkDetectorProcess) {
 		try {
-			blinkDetectorProcess.kill('SIGKILL');
+			if (process.platform === 'win32') {
+				// Use taskkill for Windows
+				exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
+					if (error) {
+						console.error('Failed to kill blink detector process on exit:', error);
+					}
+				});
+			} else {
+				blinkDetectorProcess.kill('SIGKILL');
+			}
 		} catch (error) {
 			// Process might already be dead
 		}
@@ -1072,7 +1089,16 @@ process.on('uncaughtException', (error) => {
 	console.error('Uncaught exception:', error);
 	if (blinkDetectorProcess) {
 		try {
-			blinkDetectorProcess.kill('SIGKILL');
+			if (process.platform === 'win32') {
+				// Use taskkill for Windows
+				exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
+					if (error) {
+						console.error('Failed to kill blink detector process during exception:', error);
+					}
+				});
+			} else {
+				blinkDetectorProcess.kill('SIGKILL');
+			}
 		} catch (killError) {
 			console.error('Failed to kill blink detector process during exception:', killError);
 		}
