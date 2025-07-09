@@ -75,6 +75,20 @@
 			"electron/resources/**/*",
 			"public/sounds/**/*"
 		],
+		"nsis": {
+			"oneClick": false,
+			"allowToChangeInstallationDirectory": true,
+			"createDesktopShortcut": true,
+			"createStartMenuShortcut": true,
+			"shortcutName": "ScreenBlink",
+			"installerIcon": "assets/icons/icon.ico",
+			"uninstallerIcon": "assets/icons/icon.ico",
+			"installerHeaderIcon": "assets/icons/icon.ico",
+			"deleteAppDataOnUninstall": false,
+			"displayLanguageSelector": false,
+			"installerLanguages": ["en-US"],
+			"language": "1033"
+		},
 		"mac": {
 			"target": [
 				"dmg",
@@ -96,21 +110,7 @@
 				},
 				"zip"
 			],
-			"icon": "assets/icons/icon.ico",
-			"nsis": {
-				"oneClick": false,
-				"allowToChangeInstallationDirectory": true,
-				"createDesktopShortcut": true,
-				"createStartMenuShortcut": true,
-				"shortcutName": "ScreenBlink",
-				"installerIcon": "assets/icons/icon.ico",
-				"uninstallerIcon": "assets/icons/icon.ico",
-				"installerHeaderIcon": "assets/icons/icon.ico",
-				"deleteAppDataOnUninstall": false,
-				"displayLanguageSelector": false,
-				"installerLanguages": ["en-US"],
-				"language": "1033"
-			}
+			"icon": "assets/icons/icon.ico"
 		}
 	}
 }
