@@ -106,6 +106,21 @@ function createWindow() {
 		},
 	});
 
+	// Handle window close event (X button clicked)
+	win.on('close', (event) => {
+		// On Windows, ensure the app quits completely when X is clicked
+		if (process.platform === 'win32') {
+			// Prevent default close behavior
+			event.preventDefault();
+			
+			// Use comprehensive cleanup
+			cleanupAllProcesses();
+			
+			// Force quit the app
+			app.quit();
+		}
+	});
+
 	// Send initial message to renderer
 	win.webContents.on("did-finish-load", () => {
 		win?.webContents.send("main-process-message", new Date().toLocaleString());
@@ -461,7 +476,8 @@ function startBlinkDetector() {
 		// Windows-specific options for better process management
 		...(process.platform === 'win32' && {
 			windowsHide: true,
-			detached: false
+			detached: false,
+			shell: false
 		})
 	});
 
@@ -595,9 +611,18 @@ function stopBlinkDetector() {
 				if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
 					try {
 						// Use taskkill to forcefully terminate the process tree on Windows
+						// /F = force, /T = terminate process tree (child processes), /PID = target specific PID
 						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
 							if (error) {
 								console.error('Failed to force kill blink detector process with taskkill:', error);
+								// Try alternative approach - kill by process name
+								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
+									if (error2) {
+										console.error('Failed to kill blink_detector.exe by name:', error2);
+									} else {
+										console.log('Successfully terminated blink detector process by name');
+									}
+								});
 							} else {
 								console.log('Successfully terminated blink detector process with taskkill');
 							}
@@ -1056,12 +1081,7 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
-	stopBlinkDetector();
-	stopExerciseMonitoring();
-	if (earThresholdUpdateTimeout) {
-		clearTimeout(earThresholdUpdateTimeout);
-		earThresholdUpdateTimeout = null;
-	}
+	cleanupAllProcesses();
 });
 
 // Add process exit handler as fallback for unexpected termination
@@ -1161,10 +1181,19 @@ powerMonitor.on('resume', () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
-	if (process.platform !== "darwin") {
+	// On Windows, always quit the app completely
+	if (process.platform === 'win32') {
+		// Use comprehensive cleanup
+		cleanupAllProcesses();
+		app.quit();
+		win = null;
+	} else if (process.platform !== "darwin") {
+		// On other non-macOS platforms, also quit completely
+		cleanupAllProcesses();
 		app.quit();
 		win = null;
 	}
+	// On macOS, let the app stay active (default behavior)
 });
 
 app.on("activate", () => {
@@ -1391,4 +1420,94 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 			}
 		}, 1000);
 	}
+}
+
+// Add comprehensive cleanup function
+function cleanupAllProcesses() {
+	console.log('Starting comprehensive process cleanup...');
+	
+	// Stop blink detector process
+	if (blinkDetectorProcess) {
+		console.log('Terminating blink detector process...');
+		if (process.platform === 'win32') {
+			// Try multiple termination methods on Windows
+			try {
+				blinkDetectorProcess.kill();
+				
+				// Force kill with taskkill
+				setTimeout(() => {
+					if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
+						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
+							if (error) {
+								console.error('Failed to kill by PID, trying by name...');
+								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
+									if (error2) {
+										console.error('Failed to kill blink_detector.exe:', error2);
+									} else {
+										console.log('Successfully killed blink_detector.exe by name');
+									}
+								});
+							} else {
+								console.log('Successfully killed blink detector process by PID');
+							}
+						});
+					}
+				}, 500);
+			} catch (error) {
+				console.error('Error during blink detector cleanup:', error);
+			}
+		} else {
+			blinkDetectorProcess.kill('SIGKILL');
+		}
+		blinkDetectorProcess = null;
+	}
+	
+	// Stop all intervals and timeouts
+	if (blinkIntervalId) {
+		clearInterval(blinkIntervalId);
+		blinkIntervalId = null;
+	}
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	if (exerciseIntervalId) {
+		clearInterval(exerciseIntervalId);
+		exerciseIntervalId = null;
+	}
+	if (exerciseSnoozeTimeout) {
+		clearTimeout(exerciseSnoozeTimeout);
+		exerciseSnoozeTimeout = null;
+	}
+	if (earThresholdUpdateTimeout) {
+		clearTimeout(earThresholdUpdateTimeout);
+		earThresholdUpdateTimeout = null;
+	}
+	
+	// Close all windows
+	if (currentPopup && !currentPopup.isDestroyed()) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+	if (cameraWindow && !cameraWindow.isDestroyed()) {
+		cameraWindow.close();
+		cameraWindow = null;
+	}
+	if (currentExercisePopup && !currentExercisePopup.isDestroyed()) {
+		currentExercisePopup.close();
+		currentExercisePopup = null;
+	}
+	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
+		popupEditorWindow.close();
+		popupEditorWindow = null;
+	}
+	
+	// Reset all flags
+	isBlinkDetectorRunning = false;
+	isCameraReady = false;
+	blinkReminderActive = false;
+	isExerciseShowing = false;
+	mgdReminderLoopActive = false;
+	
+	console.log('Process cleanup completed');
 }
