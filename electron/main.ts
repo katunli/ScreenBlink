@@ -110,14 +110,13 @@ function createWindow() {
 	win.on('close', (event) => {
 		// On Windows, ensure the app quits completely when X is clicked
 		if (process.platform === 'win32') {
-			// Prevent default close behavior
-			event.preventDefault();
-			
 			// Use comprehensive cleanup
 			cleanupAllProcesses();
 			
-			// Force quit the app
-			app.quit();
+			// Force quit the app after a brief delay to ensure cleanup completes
+			setTimeout(() => {
+				app.quit();
+			}, 100);
 		}
 	});
 
