@@ -457,7 +457,12 @@ function startBlinkDetector() {
 
 	console.log('Starting blink detector process:', executablePath);
 	blinkDetectorProcess = spawn(executablePath, [], {
-		stdio: ['pipe', 'pipe', 'pipe']
+		stdio: ['pipe', 'pipe', 'pipe'],
+		// Windows-specific options for better process management
+		...(process.platform === 'win32' && {
+			windowsHide: true,
+			detached: false
+		})
 	});
 
 	let buffer = '';
@@ -579,7 +584,26 @@ function startBlinkDetector() {
 
 function stopBlinkDetector() {
 	if (blinkDetectorProcess) {
-		blinkDetectorProcess.kill();
+		// On Windows, try to kill the process tree more forcefully
+		if (process.platform === 'win32') {
+			// First try graceful termination
+			blinkDetectorProcess.kill('SIGTERM');
+			
+			// Force kill after a short delay if process doesn't terminate
+			setTimeout(() => {
+				if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
+					try {
+						blinkDetectorProcess.kill('SIGKILL');
+					} catch (error) {
+						console.error('Failed to force kill blink detector process:', error);
+					}
+				}
+			}, 1000);
+		} else {
+			// On Unix-like systems, use SIGTERM
+			blinkDetectorProcess.kill('SIGTERM');
+		}
+		
 		blinkDetectorProcess = null;
 	}
 	isBlinkDetectorRunning = false;
@@ -1030,6 +1054,30 @@ app.on('before-quit', () => {
 		clearTimeout(earThresholdUpdateTimeout);
 		earThresholdUpdateTimeout = null;
 	}
+});
+
+// Add process exit handler as fallback for unexpected termination
+process.on('exit', () => {
+	if (blinkDetectorProcess) {
+		try {
+			blinkDetectorProcess.kill('SIGKILL');
+		} catch (error) {
+			// Process might already be dead
+		}
+	}
+});
+
+// Add uncaught exception handler to ensure cleanup
+process.on('uncaughtException', (error) => {
+	console.error('Uncaught exception:', error);
+	if (blinkDetectorProcess) {
+		try {
+			blinkDetectorProcess.kill('SIGKILL');
+		} catch (killError) {
+			console.error('Failed to kill blink detector process during exception:', killError);
+		}
+	}
+	process.exit(1);
 });
 
 // Add system sleep/wake handlers
