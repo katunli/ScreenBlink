@@ -598,56 +598,6 @@ function startBlinkDetector() {
 	isBlinkDetectorRunning = true;
 }
 
-function stopBlinkDetector() {
-	if (blinkDetectorProcess) {
-		// On Windows, use different termination approach
-		if (process.platform === 'win32') {
-			// Windows doesn't support SIGTERM/SIGKILL properly
-			// Use the default kill() method which sends CTRL+C equivalent
-			blinkDetectorProcess.kill();
-			
-			// Force kill after a short delay if process doesn't terminate
-			setTimeout(() => {
-				if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
-					try {
-						// Use taskkill to forcefully terminate the process tree on Windows
-						// /F = force, /T = terminate process tree (child processes), /PID = target specific PID
-						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
-							if (error) {
-								console.error('Failed to force kill blink detector process with taskkill:', error);
-								// Try alternative approach - kill by process name
-								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
-									if (error2) {
-										console.error('Failed to kill blink_detector.exe by name:', error2);
-									} else {
-										console.log('Successfully terminated blink detector process by name');
-									}
-								});
-							} else {
-								console.log('Successfully terminated blink detector process with taskkill');
-							}
-						});
-					} catch (error) {
-						console.error('Failed to force kill blink detector process:', error);
-					}
-				}
-			}, 1000);
-		} else {
-			// On Unix-like systems, use SIGTERM
-			blinkDetectorProcess.kill('SIGTERM');
-		}
-		
-		blinkDetectorProcess = null;
-	}
-	isBlinkDetectorRunning = false;
-	isCameraReady = false; // Reset camera ready flag
-	
-	if (cameraWindow) {
-		cameraWindow.close();
-		cameraWindow = null;
-	}
-}
-
 function startCamera() {
 	if (!isBlinkDetectorRunning || !blinkDetectorProcess || !blinkDetectorProcess.stdin) {
 		console.error('Blink detector not running');
