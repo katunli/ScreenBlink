@@ -453,7 +453,11 @@ function showCameraWindow() {
 
 
 function startBlinkDetector() {
-	if (isBlinkDetectorRunning) return;
+	console.log('startBlinkDetector called, isBlinkDetectorRunning:', isBlinkDetectorRunning);
+	if (isBlinkDetectorRunning) {
+		console.log('Blink detector already running, skipping...');
+		return;
+	}
 	
 	// Use the standalone binary instead of Python script
 	const binaryPath = isProd
@@ -470,6 +474,19 @@ function startBlinkDetector() {
 	}
 
 	console.log('Starting blink detector process:', executablePath);
+	isBlinkDetectorRunning = true; // Set flag immediately to prevent race conditions
+	
+	// Double-check that we don't already have a process
+	if (blinkDetectorProcess) {
+		console.log('Warning: blinkDetectorProcess already exists, cleaning up...');
+		try {
+			blinkDetectorProcess.kill();
+		} catch (error) {
+			console.error('Error killing existing process:', error);
+		}
+		blinkDetectorProcess = null;
+	}
+	
 	blinkDetectorProcess = spawn(executablePath, [], {
 		stdio: ['pipe', 'pipe', 'pipe'],
 		// Windows-specific options for better process management
@@ -593,8 +610,6 @@ function startBlinkDetector() {
 		blinkDetectorProcess = null;
 		isCameraReady = false;
 	});
-
-	isBlinkDetectorRunning = true;
 }
 
 function startCamera() {
@@ -1106,7 +1121,10 @@ powerMonitor.on('resume', () => {
 		
 		// Ensure blink detector is running (it should be from app startup)
 		if (!isBlinkDetectorRunning) {
+			console.log('Blink detector not running after resume, starting...');
 			startBlinkDetector();
+		} else {
+			console.log('Blink detector already running after resume');
 		}
 		
 		// Wait a brief moment to ensure blink detector process is ready
@@ -1166,7 +1184,12 @@ app.whenReady().then(() => {
 	}
 	
 	// Initialize blink detector on app startup (in standby mode)
-	startBlinkDetector();
+	if (!isBlinkDetectorRunning) {
+		console.log('Starting blink detector on app startup...');
+		startBlinkDetector();
+	} else {
+		console.log('Blink detector already running on app startup');
+	}
 });
 
 ipcMain.on('show-camera-window', () => {
