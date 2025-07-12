@@ -144,10 +144,9 @@ function forceKillProcessTree(pid: number): Promise<void> {
 			console.log(`Attempting to kill process tree for PID: ${pid}`);
 			
 			// First attempt: Kill by PID with process tree
-			exec(`taskkill /pid ${pid} /t /f`, (error, stdout, stderr) => {
+			exec(`taskkill /pid ${pid} /t /f`, (error, stdout) => {
 				if (error) {
 					console.log(`Failed to kill by PID ${pid}: ${error.message}`);
-					console.log(`Stderr: ${stderr}`);
 				} else {
 					console.log(`Successfully killed process tree for PID ${pid}`);
 					console.log(`Stdout: ${stdout}`);
@@ -175,7 +174,7 @@ async function aggressiveWindowsCleanup(): Promise<void> {
 	
 	// Kill all blink_detector.exe processes by name
 	await new Promise<void>((resolve) => {
-		exec('taskkill /im blink_detector.exe /f /t', (error, stdout, stderr) => {
+		exec('taskkill /im blink_detector.exe /f /t', (error, stdout) => {
 			if (error) {
 				console.log('No blink_detector.exe processes found or already killed');
 			} else {
@@ -188,7 +187,7 @@ async function aggressiveWindowsCleanup(): Promise<void> {
 	
 	// Kill all Console Window Host processes associated with our app
 	await new Promise<void>((resolve) => {
-		exec('taskkill /im conhost.exe /f', (error, stdout, stderr) => {
+		exec('taskkill /im conhost.exe /f', (error, stdout) => {
 			if (error) {
 				console.log('No conhost.exe processes found or failed to kill');
 			} else {
@@ -204,7 +203,7 @@ async function aggressiveWindowsCleanup(): Promise<void> {
 	
 	for (const processName of processesToKill) {
 		await new Promise<void>((resolve) => {
-			exec(`taskkill /im ${processName} /f /t`, (error, stdout, stderr) => {
+			exec(`taskkill /im ${processName} /f /t`, (error) => {
 				if (error) {
 					console.log(`No ${processName} processes found`);
 				} else {
@@ -266,7 +265,7 @@ del "%~f0"
 	
 	// Kill the entire process tree including this process
 	await new Promise<void>((resolve) => {
-		exec(`taskkill /pid ${currentPid} /t /f`, (error, stdout, stderr) => {
+		exec(`taskkill /pid ${currentPid} /t /f`, (error) => {
 			if (error) {
 				console.log(`Failed to kill main process tree: ${error.message}`);
 			} else {
@@ -1509,96 +1508,6 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 app.on('before-quit', () => {
 	gracefulShutdown();
 });
-
-// Add comprehensive cleanup function
-function cleanupAllProcesses() {
-	console.log('Starting comprehensive process cleanup...');
-	
-	// Stop blink detector process
-	if (blinkDetectorProcess) {
-		console.log('Terminating blink detector process...');
-		if (process.platform === 'win32') {
-			// Try multiple termination methods on Windows
-			try {
-				blinkDetectorProcess.kill();
-				
-				// Force kill with taskkill
-				setTimeout(() => {
-					if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
-						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
-							if (error) {
-								console.error('Failed to kill by PID, trying by name...');
-								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
-									if (error2) {
-										console.error('Failed to kill blink_detector.exe:', error2);
-									} else {
-										console.log('Successfully killed blink_detector.exe by name');
-									}
-								});
-							} else {
-								console.log('Successfully killed blink detector process by PID');
-							}
-						});
-					}
-				}, 500);
-			} catch (error) {
-				console.error('Error during blink detector cleanup:', error);
-			}
-		} else {
-			blinkDetectorProcess.kill('SIGKILL');
-		}
-		blinkDetectorProcess = null;
-	}
-	
-	// Stop all intervals and timeouts
-	if (blinkIntervalId) {
-		clearInterval(blinkIntervalId);
-		blinkIntervalId = null;
-	}
-	if (cameraMonitoringInterval) {
-		clearInterval(cameraMonitoringInterval);
-		cameraMonitoringInterval = null;
-	}
-	if (exerciseIntervalId) {
-		clearInterval(exerciseIntervalId);
-		exerciseIntervalId = null;
-	}
-	if (exerciseSnoozeTimeout) {
-		clearTimeout(exerciseSnoozeTimeout);
-		exerciseSnoozeTimeout = null;
-	}
-	if (earThresholdUpdateTimeout) {
-		clearTimeout(earThresholdUpdateTimeout);
-		earThresholdUpdateTimeout = null;
-	}
-	
-	// Close all windows
-	if (currentPopup && !currentPopup.isDestroyed()) {
-		currentPopup.close();
-		currentPopup = null;
-	}
-	if (cameraWindow && !cameraWindow.isDestroyed()) {
-		cameraWindow.close();
-		cameraWindow = null;
-	}
-	if (currentExercisePopup && !currentExercisePopup.isDestroyed()) {
-		currentExercisePopup.close();
-		currentExercisePopup = null;
-	}
-	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
-		popupEditorWindow.close();
-		popupEditorWindow = null;
-	}
-	
-	// Reset all flags
-	isBlinkDetectorRunning = false;
-	isCameraReady = false;
-	blinkReminderActive = false;
-	isExerciseShowing = false;
-	mgdReminderLoopActive = false;
-	
-	console.log('Process cleanup completed');
-}
 
 // Add system sleep/wake handlers
 powerMonitor.on('suspend', () => {
