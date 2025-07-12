@@ -67,6 +67,10 @@ let wasCameraEnabledBeforeSleep = false;
 
 let popupEditorWindow: BrowserWindow | null = null;
 
+// Windows process management
+let isQuitting = false;
+let childProcesses = new Set<any>();
+
 const preferences = {
 	darkMode: store.get('darkMode', true) as boolean,
 	reminderInterval: store.get('reminderInterval', 5000) as number,
@@ -91,6 +95,152 @@ const preferences = {
 	mgdMode: store.get('mgdMode', false) as boolean,
 	soundEnabled: store.get('soundEnabled', false) as boolean
 };
+
+// Windows-specific process killing function
+function forceKillProcessTree(pid: number): Promise<void> {
+	return new Promise((resolve) => {
+		if (process.platform === 'win32') {
+			// Use taskkill with /t flag to kill the entire process tree
+			exec(`taskkill /pid ${pid} /t /f`, (error) => {
+				// Resolve regardless of error (process might already be dead)
+				if (error) {
+					console.log(`Process ${pid} might already be dead or not found`);
+				}
+				resolve();
+			});
+		} else {
+			// On non-Windows platforms, use SIGKILL
+			try {
+				process.kill(pid, 'SIGKILL');
+			} catch (error) {
+				console.log(`Process ${pid} might already be dead`);
+			}
+			resolve();
+		}
+	});
+}
+
+// Function to kill all tracked child processes
+async function killAllChildProcesses(): Promise<void> {
+	console.log('Killing all child processes...');
+	const killPromises = Array.from(childProcesses).map(child => {
+		return new Promise<void>(async (resolve) => {
+			if (child && child.pid && !child.killed) {
+				try {
+					await forceKillProcessTree(child.pid);
+					console.log(`Killed child process ${child.pid}`);
+				} catch (error) {
+					console.error(`Error killing child process ${child.pid}:`, error);
+				}
+			}
+			resolve();
+		});
+	});
+	
+	await Promise.all(killPromises);
+	childProcesses.clear();
+	console.log('All child processes killed');
+}
+
+// Comprehensive shutdown function
+async function gracefulShutdown(): Promise<void> {
+	if (isQuitting) return;
+	isQuitting = true;
+	
+	console.log('Starting graceful shutdown...');
+	
+	try {
+		// Stop all intervals and timeouts first
+		if (blinkIntervalId) {
+			clearInterval(blinkIntervalId);
+			blinkIntervalId = null;
+		}
+		if (cameraMonitoringInterval) {
+			clearInterval(cameraMonitoringInterval);
+			cameraMonitoringInterval = null;
+		}
+		if (exerciseIntervalId) {
+			clearInterval(exerciseIntervalId);
+			exerciseIntervalId = null;
+		}
+		if (exerciseSnoozeTimeout) {
+			clearTimeout(exerciseSnoozeTimeout);
+			exerciseSnoozeTimeout = null;
+		}
+		if (earThresholdUpdateTimeout) {
+			clearTimeout(earThresholdUpdateTimeout);
+			earThresholdUpdateTimeout = null;
+		}
+		
+		// Close all windows
+		const windows = BrowserWindow.getAllWindows();
+		windows.forEach(window => {
+			if (!window.isDestroyed()) {
+				window.destroy();
+			}
+		});
+		
+		// Kill all child processes
+		await killAllChildProcesses();
+		
+		// Force exit after a brief delay to ensure cleanup completes
+		setTimeout(() => {
+			console.log('Shutdown complete, exiting...');
+			process.exit(0);
+		}, 100);
+		
+	} catch (error) {
+		console.error('Error during shutdown:', error);
+		process.exit(1);
+	}
+}
+
+// Setup comprehensive shutdown handlers
+function setupGracefulShutdown() {
+	// Handle before-quit event
+	app.on('before-quit', (event) => {
+		console.log('before-quit event triggered');
+		event.preventDefault();
+		gracefulShutdown();
+	});
+	
+	// Handle window-all-closed event
+	app.on('window-all-closed', () => {
+		console.log('window-all-closed event triggered');
+		if (process.platform === 'win32') {
+			gracefulShutdown();
+		}
+	});
+	
+	// Handle process termination signals
+	process.on('SIGINT', () => {
+		console.log('SIGINT received');
+		gracefulShutdown();
+	});
+	
+	process.on('SIGTERM', () => {
+		console.log('SIGTERM received');
+		gracefulShutdown();
+	});
+	
+	// Windows-specific signal
+	process.on('SIGBREAK', () => {
+		console.log('SIGBREAK received');
+		gracefulShutdown();
+	});
+	
+	// Handle uncaught exceptions
+	process.on('uncaughtException', (error) => {
+		console.error('Uncaught exception:', error);
+		gracefulShutdown();
+	});
+	
+	// Handle unhandled promise rejections
+	process.on('unhandledRejection', (reason, promise) => {
+		console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+		gracefulShutdown();
+	});
+}
 
 function createWindow() {
 	win = new BrowserWindow({
@@ -497,6 +647,14 @@ function startBlinkDetector() {
 		})
 	});
 
+	// Track the child process
+	childProcesses.add(blinkDetectorProcess);
+	
+	// Remove from tracking when process exits
+	blinkDetectorProcess.on('exit', () => {
+		childProcesses.delete(blinkDetectorProcess);
+	});
+
 	let buffer = '';
 	blinkDetectorProcess.stdout.on('data', (data: Buffer) => {
 		buffer += data.toString();
@@ -601,6 +759,7 @@ function startBlinkDetector() {
 		isBlinkDetectorRunning = false;
 		blinkDetectorProcess = null;
 		isCameraReady = false;
+		childProcesses.delete(blinkDetectorProcess);
 	});
 
 	blinkDetectorProcess.on('error', (error: Error) => {
@@ -609,6 +768,7 @@ function startBlinkDetector() {
 		isBlinkDetectorRunning = false;
 		blinkDetectorProcess = null;
 		isCameraReady = false;
+		childProcesses.delete(blinkDetectorProcess);
 	});
 }
 
@@ -1045,50 +1205,98 @@ ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 
 // Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
-	cleanupAllProcesses();
+	gracefulShutdown();
 });
 
-// Add process exit handler as fallback for unexpected termination
-process.on('exit', () => {
+// Add comprehensive cleanup function
+function cleanupAllProcesses() {
+	console.log('Starting comprehensive process cleanup...');
+	
+	// Stop blink detector process
 	if (blinkDetectorProcess) {
-		try {
-			if (process.platform === 'win32') {
-				// Use taskkill for Windows
-				exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
-					if (error) {
-						console.error('Failed to kill blink detector process on exit:', error);
+		console.log('Terminating blink detector process...');
+		if (process.platform === 'win32') {
+			// Try multiple termination methods on Windows
+			try {
+				blinkDetectorProcess.kill();
+				
+				// Force kill with taskkill
+				setTimeout(() => {
+					if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
+						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
+							if (error) {
+								console.error('Failed to kill by PID, trying by name...');
+								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
+									if (error2) {
+										console.error('Failed to kill blink_detector.exe:', error2);
+									} else {
+										console.log('Successfully killed blink_detector.exe by name');
+									}
+								});
+							} else {
+								console.log('Successfully killed blink detector process by PID');
+							}
+						});
 					}
-				});
-			} else {
-				blinkDetectorProcess.kill('SIGKILL');
+				}, 500);
+			} catch (error) {
+				console.error('Error during blink detector cleanup:', error);
 			}
-		} catch (error) {
-			// Process might already be dead
+		} else {
+			blinkDetectorProcess.kill('SIGKILL');
 		}
+		blinkDetectorProcess = null;
 	}
-});
-
-// Add uncaught exception handler to ensure cleanup
-process.on('uncaughtException', (error) => {
-	console.error('Uncaught exception:', error);
-	if (blinkDetectorProcess) {
-		try {
-			if (process.platform === 'win32') {
-				// Use taskkill for Windows
-				exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
-					if (error) {
-						console.error('Failed to kill blink detector process during exception:', error);
-					}
-				});
-			} else {
-				blinkDetectorProcess.kill('SIGKILL');
-			}
-		} catch (killError) {
-			console.error('Failed to kill blink detector process during exception:', killError);
-		}
+	
+	// Stop all intervals and timeouts
+	if (blinkIntervalId) {
+		clearInterval(blinkIntervalId);
+		blinkIntervalId = null;
 	}
-	process.exit(1);
-});
+	if (cameraMonitoringInterval) {
+		clearInterval(cameraMonitoringInterval);
+		cameraMonitoringInterval = null;
+	}
+	if (exerciseIntervalId) {
+		clearInterval(exerciseIntervalId);
+		exerciseIntervalId = null;
+	}
+	if (exerciseSnoozeTimeout) {
+		clearTimeout(exerciseSnoozeTimeout);
+		exerciseSnoozeTimeout = null;
+	}
+	if (earThresholdUpdateTimeout) {
+		clearTimeout(earThresholdUpdateTimeout);
+		earThresholdUpdateTimeout = null;
+	}
+	
+	// Close all windows
+	if (currentPopup && !currentPopup.isDestroyed()) {
+		currentPopup.close();
+		currentPopup = null;
+	}
+	if (cameraWindow && !cameraWindow.isDestroyed()) {
+		cameraWindow.close();
+		cameraWindow = null;
+	}
+	if (currentExercisePopup && !currentExercisePopup.isDestroyed()) {
+		currentExercisePopup.close();
+		currentExercisePopup = null;
+	}
+	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
+		popupEditorWindow.close();
+		popupEditorWindow = null;
+	}
+	
+	// Reset all flags
+	isBlinkDetectorRunning = false;
+	isCameraReady = false;
+	blinkReminderActive = false;
+	isExerciseShowing = false;
+	mgdReminderLoopActive = false;
+	
+	console.log('Process cleanup completed');
+}
 
 // Add system sleep/wake handlers
 powerMonitor.on('suspend', () => {
@@ -1150,15 +1358,10 @@ powerMonitor.on('resume', () => {
 app.on("window-all-closed", () => {
 	// On Windows, always quit the app completely
 	if (process.platform === 'win32') {
-		// Use comprehensive cleanup
-		cleanupAllProcesses();
-		app.quit();
-		win = null;
+		gracefulShutdown();
 	} else if (process.platform !== "darwin") {
 		// On other non-macOS platforms, also quit completely
-		cleanupAllProcesses();
-		app.quit();
-		win = null;
+		gracefulShutdown();
 	}
 	// On macOS, let the app stay active (default behavior)
 });
@@ -1172,6 +1375,9 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(() => {
+	// Setup comprehensive shutdown handlers
+	setupGracefulShutdown();
+	
 	createWindow();
 	// Register the initial shortcut
 	registerGlobalShortcut(preferences.keyboardShortcut);
@@ -1392,94 +1598,4 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 			}
 		}, 1000);
 	}
-}
-
-// Add comprehensive cleanup function
-function cleanupAllProcesses() {
-	console.log('Starting comprehensive process cleanup...');
-	
-	// Stop blink detector process
-	if (blinkDetectorProcess) {
-		console.log('Terminating blink detector process...');
-		if (process.platform === 'win32') {
-			// Try multiple termination methods on Windows
-			try {
-				blinkDetectorProcess.kill();
-				
-				// Force kill with taskkill
-				setTimeout(() => {
-					if (blinkDetectorProcess && !blinkDetectorProcess.killed) {
-						exec(`taskkill /F /T /PID ${blinkDetectorProcess.pid}`, (error) => {
-							if (error) {
-								console.error('Failed to kill by PID, trying by name...');
-								exec(`taskkill /F /IM blink_detector.exe`, (error2) => {
-									if (error2) {
-										console.error('Failed to kill blink_detector.exe:', error2);
-									} else {
-										console.log('Successfully killed blink_detector.exe by name');
-									}
-								});
-							} else {
-								console.log('Successfully killed blink detector process by PID');
-							}
-						});
-					}
-				}, 500);
-			} catch (error) {
-				console.error('Error during blink detector cleanup:', error);
-			}
-		} else {
-			blinkDetectorProcess.kill('SIGKILL');
-		}
-		blinkDetectorProcess = null;
-	}
-	
-	// Stop all intervals and timeouts
-	if (blinkIntervalId) {
-		clearInterval(blinkIntervalId);
-		blinkIntervalId = null;
-	}
-	if (cameraMonitoringInterval) {
-		clearInterval(cameraMonitoringInterval);
-		cameraMonitoringInterval = null;
-	}
-	if (exerciseIntervalId) {
-		clearInterval(exerciseIntervalId);
-		exerciseIntervalId = null;
-	}
-	if (exerciseSnoozeTimeout) {
-		clearTimeout(exerciseSnoozeTimeout);
-		exerciseSnoozeTimeout = null;
-	}
-	if (earThresholdUpdateTimeout) {
-		clearTimeout(earThresholdUpdateTimeout);
-		earThresholdUpdateTimeout = null;
-	}
-	
-	// Close all windows
-	if (currentPopup && !currentPopup.isDestroyed()) {
-		currentPopup.close();
-		currentPopup = null;
-	}
-	if (cameraWindow && !cameraWindow.isDestroyed()) {
-		cameraWindow.close();
-		cameraWindow = null;
-	}
-	if (currentExercisePopup && !currentExercisePopup.isDestroyed()) {
-		currentExercisePopup.close();
-		currentExercisePopup = null;
-	}
-	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
-		popupEditorWindow.close();
-		popupEditorWindow = null;
-	}
-	
-	// Reset all flags
-	isBlinkDetectorRunning = false;
-	isCameraReady = false;
-	blinkReminderActive = false;
-	isExerciseShowing = false;
-	mgdReminderLoopActive = false;
-	
-	console.log('Process cleanup completed');
 }
