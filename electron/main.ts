@@ -367,19 +367,19 @@ async function gracefulShutdown(): Promise<void> {
 			popupEditorWindow = null;
 		}
 		
-		// Kill all tracked child processes first
+		// Kill all tracked child processes
 		console.log('Killing tracked child processes...');
 		await killAllChildProcesses();
 		
-		// Wait a moment for processes to die
-		await new Promise(resolve => setTimeout(resolve, 500));
-		
-		// Run aggressive Windows cleanup as fallback
-		console.log('Running aggressive Windows cleanup...');
-		await aggressiveWindowsCleanup();
-		
-		// Wait another moment
-		await new Promise(resolve => setTimeout(resolve, 500));
+		// Platform-specific cleanup
+		if (process.platform === 'win32') {
+			// Windows-specific aggressive cleanup
+			console.log('Running aggressive Windows cleanup...');
+			await aggressiveWindowsCleanup();
+		} else {
+			// For macOS and other platforms, just wait a moment for processes to die
+			await new Promise(resolve => setTimeout(resolve, 500));
+		}
 		
 		// Reset all flags
 		isBlinkDetectorRunning = false;
@@ -406,44 +406,48 @@ function setupGracefulShutdown() {
 		}
 	});
 	
-	// Handle window-all-closed event
-	app.on('window-all-closed', async () => {
-		console.log('window-all-closed event triggered');
-		if (!isQuitting) {
-			await gracefulShutdown();
-			app.quit();
-		}
-	});
-	
-	// Handle app will-quit event (last chance)
-	app.on('will-quit', async (event) => {
-		console.log('will-quit event triggered');
-		if (!isQuitting) {
-			event.preventDefault();
-			await gracefulShutdown();
-			app.quit();
-		}
-	});
-	
-	// Handle process termination signals
-	process.on('SIGINT', async () => {
-		console.log('SIGINT received');
-		if (!isQuitting) {
-			await gracefulShutdown();
-			process.exit(0);
-		}
-	});
-	
-	process.on('SIGTERM', async () => {
-		console.log('SIGTERM received');
-		if (!isQuitting) {
-			await gracefulShutdown();
-			process.exit(0);
-		}
-	});
-	
-	// Windows-specific signal
+	// Platform-specific shutdown handlers
 	if (process.platform === 'win32') {
+		// Windows-specific comprehensive shutdown handling
+		console.log('Setting up Windows-specific shutdown handlers...');
+		
+		// Handle window-all-closed event for Windows
+		app.on('window-all-closed', async () => {
+			console.log('window-all-closed event triggered');
+			if (!isQuitting) {
+				await gracefulShutdown();
+				app.quit();
+			}
+		});
+		
+		// Handle app will-quit event (last chance)
+		app.on('will-quit', async (event) => {
+			console.log('will-quit event triggered');
+			if (!isQuitting) {
+				event.preventDefault();
+				await gracefulShutdown();
+				app.quit();
+			}
+		});
+		
+		// Handle process termination signals
+		process.on('SIGINT', async () => {
+			console.log('SIGINT received');
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(0);
+			}
+		});
+		
+		process.on('SIGTERM', async () => {
+			console.log('SIGTERM received');
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(0);
+			}
+		});
+		
+		// Windows-specific signal
 		process.on('SIGBREAK', async () => {
 			console.log('SIGBREAK received');
 			if (!isQuitting) {
@@ -451,33 +455,52 @@ function setupGracefulShutdown() {
 				process.exit(0);
 			}
 		});
-	}
-	
-	// Handle uncaught exceptions
-	process.on('uncaughtException', async (error) => {
-		console.error('Uncaught exception:', error);
-		if (!isQuitting) {
-			await gracefulShutdown();
-			process.exit(1);
-		}
-	});
-	
-	// Handle unhandled promise rejections
-	process.on('unhandledRejection', async (reason, promise) => {
-		console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-		if (!isQuitting) {
-			await gracefulShutdown();
-			process.exit(1);
-		}
-	});
-	
-	// Windows-specific: Handle console control events
-	if (process.platform === 'win32') {
+		
+		// Handle uncaught exceptions
+		process.on('uncaughtException', async (error) => {
+			console.error('Uncaught exception:', error);
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(1);
+			}
+		});
+		
+		// Handle unhandled promise rejections
+		process.on('unhandledRejection', async (reason, promise) => {
+			console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(1);
+			}
+		});
+		
+		// Windows-specific: Handle console control events
 		process.on('SIGBREAK', async () => {
 			console.log('Console control event received');
 			if (!isQuitting) {
 				await gracefulShutdown();
 				process.exit(0);
+			}
+		});
+	} else {
+		// macOS and other platforms use simpler shutdown handling
+		console.log('Setting up macOS/Unix shutdown handlers...');
+		
+		// Handle uncaught exceptions (minimal handling for macOS)
+		process.on('uncaughtException', async (error) => {
+			console.error('Uncaught exception:', error);
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(1);
+			}
+		});
+		
+		// Handle unhandled promise rejections (minimal handling for macOS)
+		process.on('unhandledRejection', async (reason, promise) => {
+			console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+			if (!isQuitting) {
+				await gracefulShutdown();
+				process.exit(1);
 			}
 		});
 	}
@@ -508,42 +531,49 @@ function createWindow() {
 	// Handle window close event (X button clicked)
 	win.on('close', (event) => {
 		console.log('Main window close event triggered');
-		// Prevent the window from closing immediately
-		event.preventDefault();
 		
-		// Start graceful shutdown with timeout
-		const shutdownTimeout = setTimeout(() => {
-			console.log('Graceful shutdown timed out, using nuclear option');
-			nuclearWindowsCleanup().then(() => {
-				process.exit(0);
-			});
-		}, 5000); // 5 second timeout
-		
-		// Start graceful shutdown
-		gracefulShutdown().then(() => {
-			clearTimeout(shutdownTimeout);
+		if (process.platform === 'darwin') {
+			// On macOS, hide the window instead of quitting
+			event.preventDefault();
+			win?.hide();
+		} else {
+			// On Windows and other platforms, perform full shutdown
+			event.preventDefault();
 			
-			// After cleanup is complete, use nuclear option on Windows
-			if (process.platform === 'win32') {
-				console.log('Using nuclear cleanup to ensure complete termination');
+			// Start graceful shutdown with timeout
+			const shutdownTimeout = setTimeout(() => {
+				console.log('Graceful shutdown timed out, using nuclear option');
 				nuclearWindowsCleanup().then(() => {
 					process.exit(0);
 				});
-			} else {
-				// On non-Windows, destroy window and quit normally
-				if (win && !win.isDestroyed()) {
-					win.destroy();
+			}, 5000); // 5 second timeout
+			
+			// Start graceful shutdown
+			gracefulShutdown().then(() => {
+				clearTimeout(shutdownTimeout);
+				
+				// After cleanup is complete, use nuclear option on Windows
+				if (process.platform === 'win32') {
+					console.log('Using nuclear cleanup to ensure complete termination');
+					nuclearWindowsCleanup().then(() => {
+						process.exit(0);
+					});
+				} else {
+					// On non-Windows, destroy window and quit normally
+					if (win && !win.isDestroyed()) {
+						win.destroy();
+					}
+					app.quit();
 				}
-				app.quit();
-			}
-		}).catch((error) => {
-			console.error('Error during graceful shutdown:', error);
-			clearTimeout(shutdownTimeout);
-			// Fallback to nuclear cleanup
-			nuclearWindowsCleanup().then(() => {
-				process.exit(1);
+			}).catch((error) => {
+				console.error('Error during graceful shutdown:', error);
+				clearTimeout(shutdownTimeout);
+				// Fallback to nuclear cleanup
+				nuclearWindowsCleanup().then(() => {
+					process.exit(1);
+				});
 			});
-		});
+		}
 	});
 
 	// Send initial message to renderer
@@ -1566,22 +1596,26 @@ powerMonitor.on('resume', () => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on("window-all-closed", () => {
-	// On Windows, always quit the app completely
-	if (process.platform === 'win32') {
-		gracefulShutdown();
-	} else if (process.platform !== "darwin") {
-		// On other non-macOS platforms, also quit completely
-		gracefulShutdown();
-	}
-	// On macOS, let the app stay active (default behavior)
-});
+// Note: This is now handled in setupGracefulShutdown() with platform-specific logic
 
 app.on("activate", () => {
-	// On OS X it's common to re-create a window in the app when the
-	// dock icon is clicked and there are no other windows open.
-	if (BrowserWindow.getAllWindows().length === 0) {
-		createWindow();
+	// On macOS, show the main window when dock icon is clicked
+	if (process.platform === 'darwin') {
+		if (win && !win.isDestroyed()) {
+			// If window exists but is hidden, show it
+			if (!win.isVisible()) {
+				win.show();
+			}
+			win.focus();
+		} else {
+			// If window doesn't exist, create a new one
+			createWindow();
+		}
+	} else {
+		// On other platforms, re-create a window if none exist
+		if (BrowserWindow.getAllWindows().length === 0) {
+			createWindow();
+		}
 	}
 });
 
