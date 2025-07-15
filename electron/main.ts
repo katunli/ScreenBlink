@@ -1607,7 +1607,6 @@ powerMonitor.on('resume', () => {
 	console.log('System resumed from sleep...');
 	
 	// Reset exercise timer when computer wakes from sleep
-	// This ensures exercise popup shows 20 minutes after user returns
 	store.set('lastExerciseTime', Date.now());
 	
 	// If reminders were active before sleep, restart them
@@ -1624,8 +1623,96 @@ powerMonitor.on('resume', () => {
 		preferences.isTracking = true;
 		
 		if (wasCameraEnabledBeforeSleep) {
-			// Restart camera monitoring
-			startCameraMonitoring();
+			// Check if blink detector process is still running
+			if (!isBlinkDetectorRunning || !blinkDetectorProcess) {
+				console.log('Blink detector process not running after sleep, restarting it...');
+				startBlinkDetector();
+				
+				// Wait for blink detector to be ready before starting camera
+				const waitForBlinkDetector = setInterval(() => {
+					if (isBlinkDetectorRunning && blinkDetectorProcess) {
+						clearInterval(waitForBlinkDetector);
+						console.log('Blink detector ready, starting camera...');
+						startCamera();
+					} else if (!preferences.isTracking) {
+						clearInterval(waitForBlinkDetector);
+						return;
+					}
+				}, 100);
+			} else {
+				// Just restart the camera on the existing blink detector process
+				console.log('Restarting camera on existing blink detector process...');
+				startCamera();
+			}
+			
+			// Wait for camera to be ready, then start monitoring
+			const waitForCamera = setInterval(() => {
+				if (!preferences.isTracking) {
+					console.log('Stopping camera wait interval - tracking no longer active');
+					clearInterval(waitForCamera);
+					return;
+				}
+				
+				if (isCameraReady) {
+					clearInterval(waitForCamera);
+					
+					if (!preferences.isTracking) {
+						console.log('Tracking stopped while waiting for camera, not starting monitoring');
+						return;
+					}
+					
+					// Start monitoring with existing process
+					if (preferences.mgdMode) {
+						mgdReminderLoopActive = true;
+						
+						if (blinkIntervalId) {
+							clearInterval(blinkIntervalId);
+						}
+						
+						blinkIntervalId = setInterval(() => {
+							if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
+								showBlinkPopup();
+							} else {
+								console.log('Stopping MGD interval - tracking no longer active');
+								if (blinkIntervalId) {
+									clearInterval(blinkIntervalId);
+									blinkIntervalId = null;
+								}
+								mgdReminderLoopActive = false;
+							}
+						}, preferences.reminderInterval + 2500);
+					} else {
+						cameraMonitoringInterval = setInterval(() => {
+							if (!preferences.isTracking || !isBlinkDetectorRunning) {
+								console.log('Stopping camera monitoring interval - tracking no longer active');
+								if (cameraMonitoringInterval) {
+									clearInterval(cameraMonitoringInterval);
+									cameraMonitoringInterval = null;
+								}
+								return;
+							}
+							
+							const timeSinceLastBlink = Date.now() - lastBlinkTime;
+							if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isBlinkDetectorRunning) {
+								showBlinkPopup();
+								setTimeout(() => {
+									try {
+										if (currentPopup && !currentPopup.isDestroyed()) {
+											currentPopup.close();
+											currentPopup = null;
+											lastBlinkTime = Date.now();
+										}
+									} catch (error) {
+										console.log('Popup already destroyed');
+										currentPopup = null;
+										lastBlinkTime = Date.now();
+									}
+								}, 2500);
+							}
+						}, 100);
+					}
+				}
+			}, 100);
 		} else {
 			// Restart timer-based reminders
 			startBlinkReminderLoop(preferences.reminderInterval);

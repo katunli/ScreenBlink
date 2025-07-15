@@ -335,7 +335,10 @@ def main():
             ret, frame = cap.read()
             if not ret:
                 print(json.dumps({"error": "Failed to read frame"}))
-                break
+                # Don't break the process on camera read failures
+                # This can happen during sleep/resume cycles
+                time.sleep(0.1)  # Wait a bit before trying again
+                continue
             
             # Resize frame for faster processing
             if frame.shape[:2] != processing_resolution[::-1]:  # OpenCV uses (height, width)
