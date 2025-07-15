@@ -84,7 +84,7 @@ let lastBlinkTime = Date.now();
 let cameraMonitoringInterval: NodeJS.Timeout | null = null;
 let isCameraReady = false;
 let cameraRetryCount = 0;
-const MAX_CAMERA_RETRIES = 20; // Max retries (20 * 3s = 1 minute)
+const MAX_CAMERA_RETRIES = 20; 
 
 let blinkDetectorProcess: any = null;
 let isBlinkDetectorRunning = false;
@@ -93,11 +93,10 @@ let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
 let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
-const FRAME_SKIP = 3; // Process every 3rd frame
+const FRAME_SKIP = 3; 
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
 
-// Store state before sleep
 let wasTrackingBeforeSleep = false;
 let wasCameraEnabledBeforeSleep = false;
 let isAutoResuming = false; // Prevents overlapping between automatic and user-initiated actions
@@ -369,7 +368,6 @@ async function gracefulShutdown(): Promise<void> {
 	}
 }
 
-// Setup comprehensive shutdown handlers
 function setupGracefulShutdown() {
 	console.log('Setting up graceful shutdown handlers...');
 	
@@ -492,7 +490,6 @@ function createWindow() {
 		// win.webContents.openDevTools();
 	}
 
-	// Handle window close event (X button clicked)
 	win.on('close', (event) => {
 		console.log('Main window close event triggered');
 		
@@ -510,9 +507,8 @@ function createWindow() {
 				nuclearWindowsCleanup().then(() => {
 					process.exit(0);
 				});
-			}, 5000); // 5 second timeout
+			}, 5000); 
 			
-			// Start graceful shutdown
 			gracefulShutdown().then(() => {
 				clearTimeout(shutdownTimeout);
 				
@@ -540,10 +536,8 @@ function createWindow() {
 		}
 	});
 
-	// Send initial message to renderer
 	win.webContents.on("did-finish-load", () => {
 		win?.webContents.send("main-process-message", new Date().toLocaleString());
-		// Send initial preferences
 		win?.webContents.send("load-preferences", {
 			...preferences,
 			reminderInterval: preferences.reminderInterval / 1000
@@ -558,7 +552,6 @@ function createWindow() {
 }
 
 function showStartingPopup() {
-	// Don't show popup if tracking is disabled to maintain UI state consistency
 	if (!preferences.isTracking) {
 		console.log('Not showing starting popup - tracking is disabled');
 		return;
@@ -586,7 +579,7 @@ function showStartingPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Float on top of fullscreen apps on macOS
+		type: 'panel', 
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -615,7 +608,6 @@ function showStartingPopup() {
 }
 
 function showBlinkPopup() {
-	// Don't show popup if tracking is disabled to maintain UI state consistency
 	if (!preferences.isTracking) {
 		console.log('Not showing blink popup - tracking is disabled');
 		return;
@@ -645,7 +637,7 @@ function showBlinkPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Float on top of fullscreen apps on macOS
+		type: 'panel', 
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -707,7 +699,7 @@ function showStoppedPopup() {
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
-		type: 'panel', // Float on top of fullscreen apps on macOS
+		type: 'panel', 
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -770,7 +762,7 @@ function startBlinkReminderLoop(interval: number) {
 				blinkIntervalId = null;
 			}
 		}
-	}, preferences.reminderInterval + 2500); // Add 2.5s for popup fade out
+	}, preferences.reminderInterval + 2500);
 }
 
 function stopBlinkReminderLoop() {
@@ -803,14 +795,13 @@ function stopBlinkReminderLoop() {
 	console.log('Blink reminder loop stopped');
 }
 
-// Comprehensive function to ensure no reminder activity is running
 function ensureNoReminderActivity() {
 	console.log('Ensuring no reminder activity is running...');
 	
 	blinkReminderActive = false;
 	mgdReminderLoopActive = false;
 	preferences.isTracking = false;
-	isAutoResuming = false; // Clear auto-resuming flag
+	isAutoResuming = false; 
 	
 	if (blinkIntervalId) {
 		clearInterval(blinkIntervalId);
@@ -840,7 +831,6 @@ function registerGlobalShortcut(shortcut: string) {
 	globalShortcut.register(shortcut, () => {
 		console.log('Keyboard shortcut pressed, current tracking state:', preferences.isTracking);
 		
-		// If auto-resuming is happening, stop it and take priority
 		if (isAutoResuming) {
 			console.log('User action detected during auto-resuming, stopping auto-resume and taking priority');
 			isAutoResuming = false;
@@ -848,29 +838,23 @@ function registerGlobalShortcut(shortcut: string) {
 		}
 		
 		if (preferences.isTracking) {
-			// Stop reminders
 			console.log('Stopping reminders via keyboard shortcut...');
 			ensureNoReminderActivity();
 			showStoppedPopup();
 		} else {
-			// Start reminders
 			console.log('Starting reminders via keyboard shortcut...');
 			
-			// Ensure no existing activity before starting
 			ensureNoReminderActivity();
 			
-			// Set tracking flag
 			preferences.isTracking = true;
 			
 			if (preferences.cameraEnabled) {
-				// Start camera monitoring
 				startCameraMonitoring();
 			} else {
 				startBlinkReminderLoop(preferences.reminderInterval);
 			}
 		}
 		
-		// Notify the renderer process about the state change
 		win?.webContents.send('load-preferences', {
 			...preferences,
 			reminderInterval: preferences.reminderInterval / 1000
@@ -901,7 +885,6 @@ function showCameraWindow() {
 
 	cameraWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'camera.html'));
 	
-	// Wait for window to be ready before sending video stream
 	cameraWindow.webContents.on('did-finish-load', () => {
 		// Request video stream from blink detector process
 		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
@@ -911,13 +894,11 @@ function showCameraWindow() {
 		}
 	});
 	
-	// Handle window close event
 	cameraWindow.on('closed', () => {
 		cameraWindow = null;
 		notifyCameraWindowClosed();
 	});
 
-	// Handle window close button click
 	cameraWindow.on('close', () => {
 		notifyCameraWindowClosed();
 	});
@@ -931,28 +912,23 @@ function startBlinkDetector() {
 		return;
 	}
 	
-	// Use the standalone binary instead of Python script
 	const binaryPath = isProd
 		? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'resources', 'blink_detector')
 		: path.join(process.env.APP_ROOT, 'electron', 'resources', 'blink_detector');
 
-	// Add .exe extension for Windows
 	const executablePath = process.platform === 'win32' ? binaryPath + '.exe' : binaryPath;
 
-	// Check if binary exists
 	if (!existsSync(executablePath)) {
 		console.error('Blink detector binary not found. Please run the build script first: cd python && ./build_and_install.sh');
 		return;
 	}
 
 	console.log('Starting blink detector process:', executablePath);
-	isBlinkDetectorRunning = true; // Set flag immediately to prevent race conditions
+	isBlinkDetectorRunning = true; 
 	
-	// Only clean up existing process if it's actually dead or invalid
 	if (blinkDetectorProcess) {
 		console.log('Checking if existing blink detector process is still alive...');
 		try {
-			// Check if process is still running
 			if (blinkDetectorProcess.pid && !blinkDetectorProcess.killed) {
 				console.log('Existing blink detector process is still alive, reusing it');
 				isBlinkDetectorRunning = true;
@@ -1064,26 +1040,23 @@ function startBlinkDetector() {
 					console.log('Blink detector status:', parsed.status);
 					// If the process is ready, send the initial sensitivity value
 					if (parsed.status === "Models loaded successfully, ready for camera activation" && blinkDetectorProcess.stdin) {
-						// Send initial configuration with performance optimizations
 						const config = {
 							ear_threshold: preferences.blinkSensitivity,
 							frame_skip: FRAME_SKIP,
-							target_fps: 10, // Fixed for efficiency
-							processing_resolution: [320, 240] // Fixed for efficiency
+							target_fps: 10, 
+							processing_resolution: [320, 240] 
 						};
 						blinkDetectorProcess.stdin.write(JSON.stringify(config) + '\n');
 					} else if (parsed.status === "Camera opened successfully" && blinkDetectorProcess.stdin) {
-						isCameraReady = true; // Set camera ready flag
+						isCameraReady = true; 
 						cameraRetryCount = 0; // Reset retry counter on successful camera start
 						console.log('Camera started successfully, resetting retry counter');
 					}
 				} else if (parsed.faceData) {
-					// Send face tracking data to camera window
 					if (cameraWindow && !cameraWindow.isDestroyed()) {
 						cameraWindow.webContents.send('face-tracking-data', parsed.faceData);
 					}
 				} else if (parsed.videoStream) {
-					// Handle video stream data
 					if (cameraWindow && !cameraWindow.isDestroyed()) {
 						cameraWindow.webContents.send('video-stream', parsed.videoStream);
 					}
@@ -1096,7 +1069,6 @@ function startBlinkDetector() {
 
 	blinkDetectorProcess.stderr.on('data', (data: Buffer) => {
 		console.error('Blink detector stderr:', data.toString());
-		// Send stderr to renderer for debugging
 		win?.webContents.send('camera-error', `Stderr: ${data.toString()}`);
 	});
 }
@@ -1124,13 +1096,11 @@ async function startCameraMonitoring() {
 	if (cameraMonitoringInterval) {
 		clearInterval(cameraMonitoringInterval);
 	}
-	isCameraReady = false; // Reset camera ready flag
-	cameraRetryCount = 0; // Reset retry counter for new tracking session
+	isCameraReady = false; 
+	cameraRetryCount = 0;
 	
-	// Show "Starting" popup immediately when tracking starts
 	showStartingPopup();
 	
-	// Auto-close the initial popup after 2.5 seconds
 	setTimeout(() => {
 		try {
 			if (currentPopup && !currentPopup.isDestroyed()) {
@@ -1143,13 +1113,11 @@ async function startCameraMonitoring() {
 		}
 	}, 2500);
 	
-	// Ensure blink detector process is running
 	if (!isBlinkDetectorRunning) {
 		startBlinkDetector();
 	}
 	
 	if (startCamera()) {
-		// Wait for camera to be ready before starting monitoring loop
 		const waitForCamera = setInterval(() => {
 			// Check if tracking was stopped while waiting for camera
 			if (!preferences.isTracking) {
@@ -1167,7 +1135,6 @@ async function startCameraMonitoring() {
 					return;
 				}
 				
-				// Set lastBlinkTime now that camera is ready
 				lastBlinkTime = Date.now();
 				
 				if (preferences.mgdMode) {
@@ -1181,7 +1148,6 @@ async function startCameraMonitoring() {
 					
 					// Set up interval for subsequent popups
 					blinkIntervalId = setInterval(() => {
-						// Double-check that tracking is still active
 						if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
 							showBlinkPopup();
 						} else {
@@ -1192,11 +1158,10 @@ async function startCameraMonitoring() {
 							}
 							mgdReminderLoopActive = false;
 						}
-					}, preferences.reminderInterval + 2500); // Add 2.5s for popup fade out
+					}, preferences.reminderInterval + 2500); 
 				} else {
 					// Normal mode - only show popup if no blink detected
 					cameraMonitoringInterval = setInterval(() => {
-						// Double-check that tracking is still active
 						if (!preferences.isTracking || !isBlinkDetectorRunning) {
 							console.log('Stopping camera monitoring interval - tracking no longer active');
 							if (cameraMonitoringInterval) {
@@ -1209,13 +1174,11 @@ async function startCameraMonitoring() {
 						const timeSinceLastBlink = Date.now() - lastBlinkTime;
 						if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isBlinkDetectorRunning) {
 							showBlinkPopup();
-							// Auto-close popup after 2.5 seconds
 							setTimeout(() => {
 								try {
 									if (currentPopup && !currentPopup.isDestroyed()) {
 										currentPopup.close();
 										currentPopup = null;
-										// Update lastBlinkTime when popup closes
 										lastBlinkTime = Date.now();
 									}
 								} catch (error) {
@@ -1225,7 +1188,7 @@ async function startCameraMonitoring() {
 								}
 							}, 2500);
 						}
-					}, 100); // Check every 100ms
+					}, 100); 
 				}
 			}
 		}, 100); // Check every 100ms for camera readiness
@@ -1238,10 +1201,7 @@ async function startCameraMonitoring() {
 
 ipcMain.on("blink-detected", () => {
 	lastBlinkTime = Date.now();
-	
-	// Close popup in both normal and MGD modes
-	// The Python process now handles frame skipping internally
-	try {
+		try {
 		if (currentPopup && !currentPopup.isDestroyed()) {
 			currentPopup.close();
 			currentPopup = null;
@@ -1262,14 +1222,11 @@ ipcMain.on("start-blink-reminders", (_event, interval: number) => {
 		ensureNoReminderActivity();
 	}
 	
-	// Ensure no existing activity before starting
 	ensureNoReminderActivity();
 	
-	// Set tracking flag
 	preferences.isTracking = true;
 	
 	if (preferences.cameraEnabled) {
-		// Start camera monitoring (lastBlinkTime will be set when camera is ready)
 		startCameraMonitoring();
 	} else {
 		startBlinkReminderLoop(interval);
@@ -1303,12 +1260,10 @@ ipcMain.on("update-popup-colors", (_event, colors) => {
 	preferences.popupColors = colors;
 	store.set('popupColors', colors);
 	
-	// Update transparency of current popup if it exists
 	if (currentPopup && !currentPopup.isDestroyed()) {
 		currentPopup.setOpacity(1 - colors.transparency);
 	}
 	
-	// Update transparency of popup editor window if it exists
 	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
 		popupEditorWindow.setOpacity(1 - colors.transparency);
 	}
@@ -1318,12 +1273,10 @@ ipcMain.on("update-popup-transparency", (_event, transparency: number) => {
 	preferences.popupColors.transparency = transparency;
 	store.set('popupColors', preferences.popupColors);
 	
-	// Update transparency of current popup if it exists
 	if (currentPopup && !currentPopup.isDestroyed()) {
 		currentPopup.setOpacity(1 - transparency);
 	}
 	
-	// Update transparency of popup editor window if it exists
 	if (popupEditorWindow && !popupEditorWindow.isDestroyed()) {
 		popupEditorWindow.setOpacity(1 - transparency);
 	}
@@ -1343,7 +1296,6 @@ ipcMain.on("update-camera-enabled", (_event, enabled: boolean) => {
 	preferences.cameraEnabled = enabled;
 	store.set('cameraEnabled', enabled);
 	
-	// Update camera mode status in popup if it exists
 	if (currentPopup) {
 		currentPopup.webContents.send('camera-mode', enabled);
 	}
@@ -1384,7 +1336,6 @@ ipcMain.on("start-camera-tracking", () => {
 		showStoppedPopup();
 	}
 	
-	// Update the preference flag
 	preferences.cameraEnabled = true;
 	store.set('cameraEnabled', true);
 });
@@ -1396,7 +1347,6 @@ ipcMain.on("stop-camera-tracking", () => {
 		showStoppedPopup();
 	}
 	
-	// Update the preference flag
 	preferences.cameraEnabled = false;
 	store.set('cameraEnabled', false);
 });
@@ -1420,17 +1370,14 @@ ipcMain.on("update-blink-sensitivity", (_event, sensitivity: number) => {
 });
 
 function showExercisePopup() {
-	// Prevent overlapping exercises
 	if (isExerciseShowing || currentExercisePopup) {
 		return;
 	}
 
-	// Play notification sound
 	playNotificationSound('exercise');
 
 	isExerciseShowing = true;
 
-	// Close any existing exercise popup (extra safety)
 	if (currentExercisePopup) {
 		(currentExercisePopup as BrowserWindow).close();
 		currentExercisePopup = null;
@@ -1458,15 +1405,14 @@ function showExercisePopup() {
 		focusable: true,
 		show: false,
 		hasShadow: false,
-		type: 'panel', // Enable floating on top of full-screened apps on macOS
+		type: 'panel',
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
 		},
 	});
 
-	// Set window level to stay on top of fullscreen applications
-	// Use 'floating' for macOS and 'screen-saver' for other platforms
+
 	const level = process.platform === 'darwin' ? 'floating' : 'screen-saver';
 	popup.setAlwaysOnTop(true, level);
 	
@@ -1488,7 +1434,6 @@ function showExercisePopup() {
 		popup.show();
 	});
 
-	// Handle window close
 	popup.on('closed', () => {
 		if (currentExercisePopup === popup) {
 			currentExercisePopup = null;
@@ -1496,7 +1441,6 @@ function showExercisePopup() {
 		}
 	});
 
-	// Auto-close after 1 minute
 	setTimeout(() => {
 		if (currentExercisePopup === popup) {
 			popup.close();
@@ -1511,19 +1455,18 @@ function startExerciseMonitoring() {
 		clearInterval(exerciseIntervalId);
 	}
 
-	// Check every minute
+	
 	exerciseIntervalId = setInterval(() => {
 		const now = Date.now();
 		const timeSinceLastExercise = now - (store.get('lastExerciseTime', 0) as number);
 
-		// Show exercise every 20 minutes
 		if (preferences.eyeExercisesEnabled && 
 			!isExerciseShowing && 
 			timeSinceLastExercise >= preferences.exerciseInterval * 60 * 1000) {
 			showExercisePopup();
 			store.set('lastExerciseTime', now);
 		}
-	}, 60 * 1000); // Check every minute
+	}, 60 * 1000); 
 }
 
 function stopExerciseMonitoring() {
@@ -1570,21 +1513,15 @@ ipcMain.on("update-mgd-mode", (_event, enabled: boolean) => {
 	store.set('mgdMode', enabled);
 });
 
-// Add IPC handler for sound preference
 ipcMain.on("update-sound-enabled", (_event, enabled: boolean) => {
 	preferences.soundEnabled = enabled;
 	store.set('soundEnabled', enabled);
 });
 
-// Add IPC handler for performance mode
-// Removed as performance mode is no longer configurable - using fixed efficient values
-
-// Add cleanup for Python process in the app quit handler
 app.on('before-quit', () => {
 	gracefulShutdown();
 });
 
-// Add system sleep/wake handlers
 powerMonitor.on('suspend', () => {
 	console.log('System going to sleep, stopping reminders...');
 	
@@ -1595,7 +1532,6 @@ powerMonitor.on('suspend', () => {
 	// If reminders were active, stop them completely (equivalent to pressing stop)
 	if (preferences.isTracking) {
 		ensureNoReminderActivity();
-		// Don't show stopped popup during sleep
 		if (currentPopup) {
 			currentPopup.close();
 			currentPopup = null;
@@ -1606,29 +1542,23 @@ powerMonitor.on('suspend', () => {
 powerMonitor.on('resume', () => {
 	console.log('System resumed from sleep...');
 	
-	// Reset exercise timer when computer wakes from sleep
 	store.set('lastExerciseTime', Date.now());
 	
 	// If reminders were active before sleep, restart them
 	if (wasTrackingBeforeSleep) {
 		console.log('Restarting reminders after sleep...');
 		
-		// Set auto-resuming flag to prevent overlapping with user actions
 		isAutoResuming = true;
 		
-		// Reset last blink time
 		lastBlinkTime = Date.now();
 		
-		// Set tracking flag back to true
 		preferences.isTracking = true;
 		
 		if (wasCameraEnabledBeforeSleep) {
-			// Check if blink detector process is still running
 			if (!isBlinkDetectorRunning || !blinkDetectorProcess) {
 				console.log('Blink detector process not running after sleep, restarting it...');
 				startBlinkDetector();
 				
-				// Wait for blink detector to be ready before starting camera
 				const waitForBlinkDetector = setInterval(() => {
 					if (isBlinkDetectorRunning && blinkDetectorProcess) {
 						clearInterval(waitForBlinkDetector);
@@ -1640,12 +1570,10 @@ powerMonitor.on('resume', () => {
 					}
 				}, 100);
 			} else {
-				// Just restart the camera on the existing blink detector process
 				console.log('Restarting camera on existing blink detector process...');
 				startCamera();
 			}
 			
-			// Wait for camera to be ready, then start monitoring
 			const waitForCamera = setInterval(() => {
 				if (!preferences.isTracking) {
 					console.log('Stopping camera wait interval - tracking no longer active');
@@ -1718,17 +1646,15 @@ powerMonitor.on('resume', () => {
 			startBlinkReminderLoop(preferences.reminderInterval);
 		}
 		
-		// Notify renderer of updated preferences
 		win?.webContents.send('load-preferences', {
 			...preferences,
 			reminderInterval: preferences.reminderInterval / 1000
 		});
 		
-		// Clear auto-resuming flag after a delay to allow UI to update
 		setTimeout(() => {
 			isAutoResuming = false;
 			console.log('Auto-resuming completed, user actions now take priority');
-		}, 3000); // 3 second delay
+		}, 3000); 
 	}
 });
 
@@ -1759,11 +1685,9 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(() => {
-	// Setup comprehensive shutdown handlers
 	setupGracefulShutdown();
 	
 	createWindow();
-	// Register the initial shortcut
 	registerGlobalShortcut(preferences.keyboardShortcut);
 	
 	// Reset exercise timer when app starts
@@ -1786,7 +1710,6 @@ ipcMain.on('show-camera-window', () => {
 	showCameraWindow();
 });
 
-// When camera window is closed, notify renderer
 function notifyCameraWindowClosed() {
 	if (win && !win.isDestroyed()) {
 		win.webContents.send('camera-window-closed');
@@ -1806,7 +1729,6 @@ function showPopupEditor() {
 		return;
 	}
 
-	// Start at current popup size and position
 	const width = preferences.popupSize.width;
 	const height = preferences.popupSize.height;
 	const x = preferences.popupPosition.x;
@@ -1828,7 +1750,7 @@ function showPopupEditor() {
 		show: false,
 		hasShadow: false,
 		movable: true,
-		type: 'panel', // Enable floating on top of full-screened apps on macOS
+		type: 'panel',
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
@@ -1847,7 +1769,6 @@ function showPopupEditor() {
 		skipTransformProcessType: true 
 	});
 
-	// Set initial transparency
 	popupEditorWindow.setOpacity(1 - preferences.popupColors.transparency);
 
 	popupEditorWindow.loadFile(path.join(process.env.VITE_PUBLIC, "popup-editor.html"));
@@ -1869,25 +1790,21 @@ function showPopupEditor() {
 	});
 }
 
-// Replace the show-position-editor and show-size-editor handlers with a single handler
 ipcMain.on("show-popup-editor", () => {
 	showPopupEditor();
 });
 
-// Add handler for the combined save event
 ipcMain.on("popup-editor-saved", (_event, { size, position }) => {
 	preferences.popupSize = size;
 	preferences.popupPosition = position;
 	store.set('popupSize', size);
 	store.set('popupPosition', position);
 	
-	// If there's an active popup, update its size and position
 	if (currentPopup && !currentPopup.isDestroyed()) {
 		currentPopup.setSize(size.width, size.height);
 		currentPopup.setPosition(position.x, position.y);
 	}
 
-	// Notify renderer of updated preferences
 	win?.webContents.send('load-preferences', {
 		...preferences,
 		reminderInterval: preferences.reminderInterval / 1000
@@ -1895,16 +1812,13 @@ ipcMain.on("popup-editor-saved", (_event, { size, position }) => {
 });
 
 ipcMain.on('reset-preferences', () => {
-  // Stop any active reminders first
   if (preferences.isTracking) {
     stopBlinkReminderLoop();
     showStoppedPopup();
   }
   
-  // Stop exercise monitoring if active
   stopExerciseMonitoring();
   
-  // Clear all stored preferences
   store.clear();
   
   
@@ -1931,14 +1845,12 @@ ipcMain.on('reset-preferences', () => {
   // Re-register the default keyboard shortcut
   registerGlobalShortcut(preferences.keyboardShortcut);
   
-  // Notify renderer of updated preferences
   win?.webContents.send('load-preferences', {
     ...preferences,
     reminderInterval: preferences.reminderInterval / 1000
   });
 });
 
-// Add sound playing function
 function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'blink') {
 	if (preferences.soundEnabled) {
 		let soundFileName: string;

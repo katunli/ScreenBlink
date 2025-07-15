@@ -12,7 +12,7 @@ interface UserPreferences {
   reminderInterval: number;
   cameraEnabled: boolean;
   eyeExercisesEnabled: boolean;
-  exerciseInterval: number; // Exercise interval in minutes
+  exerciseInterval: number; 
   popupPosition: string;
   popupSize: { width: number; height: number };
   popupColors: PopupColors;
@@ -31,7 +31,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   reminderInterval: 5,
   cameraEnabled: false,
   eyeExercisesEnabled: true,
-  exerciseInterval: 20, // Default to 20 minutes
+  exerciseInterval: 20, 
   popupPosition: 'top-right',
   popupSize: { width: 220, height: 80 },
   popupColors: {
@@ -87,13 +87,11 @@ export default function ScreenBlinkHomepage() {
 
     window.ipcRenderer?.on('load-preferences', handlePreferences);
     
-    // Cleanup
     return () => {
       window.ipcRenderer?.off('load-preferences', handlePreferences);
     };
   }, []);
 
-  // Handle camera errors
   useEffect(() => {
     const handleCameraError = (_event: any, error: string) => {
       console.error('Camera error:', error);
@@ -155,7 +153,6 @@ export default function ScreenBlinkHomepage() {
       if (isRecordingShortcut) {
         e.preventDefault();
 
-        // Handle Enter and Escape to save or cancel
         if (e.key === 'Enter') {
           handleSaveShortcut();
           return;
