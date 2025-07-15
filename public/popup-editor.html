@@ -18,6 +18,7 @@
       background: rgba(255, 255, 255, 0.3);
       font-family: system-ui, -apple-system, sans-serif;
       -webkit-app-region: drag; /* Make the entire window draggable */
+      position: relative;
     }
     .container {
       width: 100%;
@@ -27,67 +28,318 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 8px;
+      padding: 6px;
+      position: relative;
+      z-index: 10;
+      min-height: 60px;
     }
     .title {
       font-size: 0.9rem;
-      font-weight: bold;
+      font-weight: 700;
       text-align: center;
       margin-bottom: 2px;
       -webkit-app-region: drag;
+      background: #000000;
+      color: #FFFFFF;
+      padding: 2px 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .title:hover {
+      background: #333333;
     }
     .instructions {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       text-align: center;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       -webkit-app-region: drag;
+      line-height: 1.2;
+      max-width: 95%;
+      background: #000000;
+      color: #FFFFFF;
+      padding: 1px 3px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .instructions:hover {
+      background: #333333;
     }
     .size-display {
-      font-size: 0.8rem;
+      font-size: 0.7rem;
+      font-weight: 600;
       text-align: center;
       margin-bottom: 4px;
       -webkit-app-region: drag;
+      background: #000000;
+      color: #FFFFFF;
+      padding: 3px 6px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.3);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .size-display:hover {
+      background: #333333;
     }
     .buttons {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       -webkit-app-region: no-drag;
     }
     button {
-      padding: 4px 8px;
+      padding: 3px 8px;
       border: none;
-      border-radius: 4px;
-      font-size: 0.7rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      min-width: 60px;
+      min-width: 50px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      color: #FFFFFF;
     }
     button:hover {
       opacity: 0.9;
       transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.6);
     }
     button:active {
-      transform: translateY(1px);
+      transform: translateY(0px);
     }
     .save {
-      background: #3B82F6;
-      color: white;
+      background: #10B981;
     }
     .cancel {
       background: #EF4444;
-      color: white;
     }
+    
+    /* Resize handles */
+    .resize-handle {
+      position: absolute;
+      background: transparent;
+      border-radius: 2px;
+      z-index: 20;
+      -webkit-app-region: no-drag;
+    }
+    .resize-handle::after {
+      content: '';
+      position: absolute;
+      background: transparent;
+      border-radius: 1px;
+    }
+    .resize-handle.n {
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 4px;
+      cursor: n-resize;
+    }
+    .resize-handle.n::after {
+      top: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 2px;
+    }
+    .resize-handle.s {
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 4px;
+      cursor: s-resize;
+    }
+    .resize-handle.s::after {
+      top: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 2px;
+    }
+    .resize-handle.e {
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 30px;
+      cursor: e-resize;
+    }
+    .resize-handle.e::after {
+      top: 50%;
+      right: 1px;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 20px;
+    }
+    .resize-handle.w {
+      left: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 30px;
+      cursor: w-resize;
+    }
+    .resize-handle.w::after {
+      top: 50%;
+      left: 1px;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 20px;
+    }
+    .resize-handle.ne {
+      top: 2px;
+      right: 2px;
+      width: 8px;
+      height: 8px;
+      cursor: ne-resize;
+      border-radius: 50%;
+    }
+    .resize-handle.ne::after {
+      top: 2px;
+      right: 2px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+    }
+    .resize-handle.nw {
+      top: 2px;
+      left: 2px;
+      width: 8px;
+      height: 8px;
+      cursor: nw-resize;
+      border-radius: 50%;
+    }
+    .resize-handle.nw::after {
+      top: 2px;
+      left: 2px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+    }
+    .resize-handle.se {
+      bottom: 2px;
+      right: 2px;
+      width: 8px;
+      height: 8px;
+      cursor: se-resize;
+      border-radius: 50%;
+    }
+    .resize-handle.se::after {
+      bottom: 2px;
+      right: 2px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+    }
+    .resize-handle.sw {
+      bottom: 2px;
+      left: 2px;
+      width: 8px;
+      height: 8px;
+      cursor: sw-resize;
+      border-radius: 50%;
+    }
+    .resize-handle.sw::after {
+      bottom: 2px;
+      left: 2px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+    }
+    
+    /* Drag indicator */
+    .drag-indicator {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #000000;
+      color: #FFFFFF;
+      padding: 3px 6px;
+      border-radius: 3px;
+      font-size: 0.6rem;
+      font-weight: 600;
+      z-index: 30;
+      -webkit-app-region: no-drag;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .drag-indicator.show {
+      opacity: 1;
+    }
+    
+    /* Corner indicators */
+    .corner-indicator {
+      position: absolute;
+      font-size: 0.8rem;
+      font-weight: 300;
+      z-index: 15;
+      -webkit-app-region: no-drag;
+      pointer-events: none;
+      text-shadow: 
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000,
+        0 0 2px rgba(0,0,0,0.8);
+    }
+    .corner-indicator.top-left {
+      top: 3px;
+      left: 3px;
+    }
+    .corner-indicator.top-right {
+      top: 3px;
+      right: 3px;
+    }
+    .corner-indicator.bottom-left {
+      bottom: 3px;
+      left: 3px;
+    }
+    .corner-indicator.bottom-right {
+      bottom: 3px;
+      right: 3px;
+    }
+    
     @media (prefers-color-scheme: dark) {
       html, body {
         background: rgba(0, 0, 0, 0.5);
+      }
+      .size-display {
+        background: #000000;
+        border-color: rgba(255,255,255,0.4);
       }
     }
   </style>
 </head>
 <body>
+  <!-- Resize handles -->
+  <div class="resize-handle n"></div>
+  <div class="resize-handle s"></div>
+  <div class="resize-handle e"></div>
+  <div class="resize-handle w"></div>
+  <div class="resize-handle ne"></div>
+  <div class="resize-handle nw"></div>
+  <div class="resize-handle se"></div>
+  <div class="resize-handle sw"></div>
+  
+  <!-- Corner indicators -->
+  <div class="corner-indicator top-left">↖</div>
+  <div class="corner-indicator top-right">↗</div>
+  <div class="corner-indicator bottom-left">↙</div>
+  <div class="corner-indicator bottom-right">↘</div>
+  
+  <!-- Drag indicator -->
+  <div class="drag-indicator" id="dragIndicator">Click & Drag to Move</div>
+  
   <div class="container">
-    <div class="title">Edit Popup</div>
-    <div class="instructions">Drag to position and resize window</div>
+    <div class="title">EDIT POPUP</div>
+    <div class="instructions">
+      <strong>Click & drag</strong> to move • <strong>Drag edges</strong> to resize
+    </div>
     <div class="size-display" id="sizeDisplay">Width: 220px, Height: 80px</div>
     <div class="buttons">
       <button class="save" id="saveBtn">Save</button>
@@ -100,9 +352,12 @@
     function updateColors(colors) {
       // Use solid background color without alpha channel - transparency is handled by window opacity
       document.body.style.background = colors.background;
-      document.querySelector('.title').style.color = colors.text;
-      document.querySelector('.instructions').style.color = colors.text;
-      document.querySelector('.size-display').style.color = colors.text;
+      
+      // Update corner indicator colors to match user's custom text color
+      const cornerIndicators = document.querySelectorAll('.corner-indicator');
+      cornerIndicators.forEach(indicator => {
+        indicator.style.color = colors.text;
+      });
     }
 
     // Set initial colors
@@ -165,6 +420,42 @@
         document.getElementById('saveBtn').click();
       }
     });
+    
+    // Show drag indicator on mouse down (but not on resize handles)
+    let isDragging = false;
+    let isOverResizeHandle = false;
+    
+    document.addEventListener('mousedown', (event) => {
+      // Check if the click is on a resize handle
+      const target = event.target;
+      if (target.classList.contains('resize-handle') || target.classList.contains('corner-indicator')) {
+        isOverResizeHandle = true;
+        return;
+      }
+      
+      if (!isDragging && !isOverResizeHandle) {
+        const dragIndicator = document.getElementById('dragIndicator');
+        dragIndicator.classList.add('show');
+        setTimeout(() => {
+          dragIndicator.classList.remove('show');
+        }, 2000);
+      }
+    });
+    
+    // Track when mouse enters/leaves resize handles
+    const resizeHandles = document.querySelectorAll('.resize-handle');
+    resizeHandles.forEach(handle => {
+      handle.addEventListener('mouseenter', () => {
+        isOverResizeHandle = true;
+      });
+      
+      handle.addEventListener('mouseleave', () => {
+        isOverResizeHandle = false;
+      });
+    });
+    
+    // Add visual feedback for resize handles (removed since they're now invisible)
+    // The handles are now completely invisible but still functional
   </script>
 </body>
 </html> 
