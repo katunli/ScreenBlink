@@ -17,21 +17,3 @@ Download the latest release from the [Releases](https://github.com/katunli/Scree
 
 ### macOS
 Download the latest release from the [Releases](https://github.com/katunli/ScreenBlink/releases) page.
-
-## Development
-
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- Git LFS (for model files)
-
-### Setup
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Setup Python environment: `cd python && ./setup.sh`
-4. Build Python binary: `cd python && ./build_and_install.sh`
-5. Start development: `npm run dev`
-
-## Testing LFS Cleanup
-
-This commit tests if the LFS cleanup resolved the Windows build issues.
