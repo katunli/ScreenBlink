@@ -27,6 +27,14 @@ target_fps = TARGET_FPS
 processing_resolution = PROCESSING_RESOLUTION
 current_ear_threshold = EAR_THRESHOLD 
 
+# Performance optimization: Pre-allocated buffers
+class PreallocatedBuffers:
+    def __init__(self, max_points=68):
+        self.landmarks_array = np.zeros((max_points, 2), dtype=np.int32)
+        self.left_eye = np.zeros((6, 2), dtype=np.int32)
+        self.right_eye = np.zeros((6, 2), dtype=np.int32)
+        self.temp_frame = None
+
 def calculate_ear(eye_points):
     # Calculate the vertical distances
     vertical_dist1 = np.linalg.norm(eye_points[1] - eye_points[5])
@@ -36,6 +44,30 @@ def calculate_ear(eye_points):
     # Compute the eye aspect ratio
     ear = (vertical_dist1 + vertical_dist2) / (2.0 * horizontal_dist)
     return ear
+
+def calculate_ear_fast(eye_points):
+    # Vectorized EAR calculation for maximum performance
+    # Pre-calculate all point differences
+    diffs = np.array([
+        eye_points[1] - eye_points[5],  # v1: vertical distance 1 (top-bottom)
+        eye_points[2] - eye_points[4],  # v2: vertical distance 2 (top-bottom)  
+        eye_points[0] - eye_points[3]   # h: horizontal distance (left-right)
+    ])
+    
+    # Vectorized distance calculation - all 3 distances computed simultaneously
+    distances = np.sqrt(np.sum(diffs**2, axis=1))
+    
+    # Apply EAR formula: (v1 + v2) / (2 * h)
+    return (distances[0] + distances[1]) / (2.0 * distances[2] + 1e-6)
+
+# Performance optimization: Only extract eye landmarks
+def get_eye_landmarks_only(predictor, gray, face, buffers):
+    shape = predictor(gray, face)
+    # Extract only eye points (indices 36-47)
+    for i in range(6):
+        buffers.left_eye[i] = [shape.part(36 + i).x, shape.part(36 + i).y]
+        buffers.right_eye[i] = [shape.part(42 + i).x, shape.part(42 + i).y]
+    return buffers.left_eye, buffers.right_eye
 
 def encode_frame(frame):
     # Encode frame as JPEG with lower quality for better performance
@@ -288,6 +320,9 @@ def main():
     
     predictor = dlib.shape_predictor(predictor_path)
     
+    # Performance optimization: Pre-allocate buffers
+    buffers = PreallocatedBuffers()
+    
     print(json.dumps({"status": "Models loaded successfully, ready for camera activation"}))
     print(json.dumps({"debug": f"Initial EAR threshold set to: {current_ear_threshold}"}))
     sys.stdout.flush()
@@ -353,25 +388,18 @@ def main():
             if should_detect_face:
                 # Detect faces using dlib on the full frame
                 # Use smaller detection scale for faster processing
-                faces = detector(gray, 1)  # Scale factor of 1 instead of 0 for speed
+                faces = detector(gray, 0)  # Scale factor of 1 instead of 0 for speed
                 last_face_detection_time = current_time
                 
                 face_data = default_face_data.copy()  # Use pre-allocated structure
                 
                 for face in faces:
-                    # Get facial landmarks
-                    landmarks = predictor(gray, face)
+                    # Performance optimization: Use optimized landmark extraction
+                    left_eye, right_eye = get_eye_landmarks_only(predictor, gray, face, buffers)
                     
-                    # Convert landmarks to numpy array
-                    points = np.array([[p.x, p.y] for p in landmarks.parts()])
-                    
-                    # Get eye landmarks
-                    left_eye = points[36:42]  # Left eye landmarks
-                    right_eye = points[42:48]  # Right eye landmarks
-                    
-                    # Calculate EAR for both eyes
-                    left_ear = calculate_ear(left_eye)
-                    right_ear = calculate_ear(right_eye)
+                    # Performance optimization: Use faster EAR calculation
+                    left_ear = calculate_ear_fast(left_eye)
+                    right_ear = calculate_ear_fast(right_eye)
                     avg_ear = (left_ear + right_ear) / 2.0
                     
                     # Update face data
