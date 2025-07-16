@@ -35,16 +35,6 @@ class PreallocatedBuffers:
         self.right_eye = np.zeros((6, 2), dtype=np.int32)
         self.temp_frame = None
 
-def calculate_ear(eye_points):
-    # Calculate the vertical distances
-    vertical_dist1 = np.linalg.norm(eye_points[1] - eye_points[5])
-    vertical_dist2 = np.linalg.norm(eye_points[2] - eye_points[4])
-    # Calculate the horizontal distance
-    horizontal_dist = np.linalg.norm(eye_points[0] - eye_points[3])
-    # Compute the eye aspect ratio
-    ear = (vertical_dist1 + vertical_dist2) / (2.0 * horizontal_dist)
-    return ear
-
 def calculate_ear_fast(eye_points):
     # Vectorized EAR calculation for maximum performance
     # Pre-calculate all point differences
