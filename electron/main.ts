@@ -148,13 +148,37 @@ function forceKillProcessTree(pid: number): Promise<void> {
 				resolve();
 			});
 		} else {
-			try {
-				process.kill(pid, 'SIGKILL');
-				console.log(`Killed process ${pid} with SIGKILL`);
-			} catch (error) {
-				console.log(`Process ${pid} might already be dead`);
-			}
-			resolve();
+			// On macOS, kill the entire process tree
+			console.log(`Attempting to kill process tree for PID: ${pid} on macOS`);
+			
+			// First try to kill the process and its children gracefully
+			exec(`pkill -P ${pid}`, (error) => {
+				if (error) {
+					console.log(`No child processes found for PID ${pid}`);
+				} else {
+					console.log(`Killed child processes of PID ${pid}`);
+				}
+				
+				// Then kill the main process
+				try {
+					process.kill(pid, 'SIGTERM');
+					console.log(`Sent SIGTERM to process ${pid}`);
+					
+					// Wait a bit and then force kill if still alive
+					setTimeout(() => {
+						try {
+							process.kill(pid, 'SIGKILL');
+							console.log(`Sent SIGKILL to process ${pid}`);
+						} catch (error) {
+							console.log(`Process ${pid} already terminated`);
+						}
+						resolve();
+					}, 1000);
+				} catch (error) {
+					console.log(`Process ${pid} might already be dead`);
+					resolve();
+				}
+			});
 		}
 	});
 }
@@ -205,6 +229,71 @@ async function aggressiveWindowsCleanup(): Promise<void> {
 	}
 	
 	console.log('Aggressive Windows cleanup completed');
+}
+
+// Aggressive macOS process cleanup
+async function aggressiveMacCleanup(): Promise<void> {
+	if (process.platform !== 'darwin') return;
+	
+	console.log('Starting aggressive macOS process cleanup...');
+	
+	// Kill processes by name using pkill
+	const processesToKill = ['blink_detector', 'python', 'python3'];
+	
+	for (const processName of processesToKill) {
+		await new Promise<void>((resolve) => {
+			exec(`pkill -f ${processName}`, (error, stdout) => {
+				if (error) {
+					console.log(`No ${processName} processes found or already killed`);
+				} else {
+					console.log(`Killed all ${processName} processes by name`);
+					console.log(`Stdout: ${stdout}`);
+				}
+				resolve();
+			});
+		});
+	}
+	
+	// Kill any remaining processes that might be related to our app
+	await new Promise<void>((resolve) => {
+		exec('pkill -f "ScreenBlink"', (error, stdout) => {
+			if (error) {
+				console.log('No ScreenBlink-related processes found');
+			} else {
+				console.log('Killed ScreenBlink-related processes');
+				console.log(`Stdout: ${stdout}`);
+			}
+			resolve();
+		});
+	});
+	
+	// Use killall for additional cleanup
+	await new Promise<void>((resolve) => {
+		exec('killall -9 blink_detector 2>/dev/null || true', (error, stdout) => {
+			if (error) {
+				console.log('No blink_detector processes found with killall');
+			} else {
+				console.log('Killed blink_detector processes with killall');
+				console.log(`Stdout: ${stdout}`);
+			}
+			resolve();
+		});
+	});
+	
+	// Kill any Python processes that might be running our blink detector
+	await new Promise<void>((resolve) => {
+		exec('pkill -f "blink_detector"', (error, stdout) => {
+			if (error) {
+				console.log('No blink_detector Python processes found');
+			} else {
+				console.log('Killed blink_detector Python processes');
+				console.log(`Stdout: ${stdout}`);
+			}
+			resolve();
+		});
+	});
+	
+	console.log('Aggressive macOS cleanup completed');
 }
 
 // Nuclear cleanup option for Windows
@@ -261,6 +350,70 @@ del "%~f0"
 	});
 	
 	console.log('Nuclear cleanup completed');
+}
+
+// Nuclear cleanup option for macOS
+async function nuclearMacCleanup(): Promise<void> {
+	if (process.platform !== 'darwin') return;
+	
+	console.log('Starting nuclear macOS cleanup...');
+	
+	const currentPid = process.pid;
+	console.log(`Current process PID: ${currentPid}`);
+	
+	// Create a cleanup script that will run after we exit
+	const cleanupScript = `#!/bin/bash
+echo "Starting delayed macOS cleanup..."
+sleep 2
+echo "Killing any remaining ScreenBlink processes..."
+
+# Kill by process name
+pkill -f "blink_detector" 2>/dev/null || true
+pkill -f "ScreenBlink" 2>/dev/null || true
+pkill -f "python.*blink" 2>/dev/null || true
+
+# Kill by executable name
+killall -9 blink_detector 2>/dev/null || true
+
+# Find and kill any remaining child processes
+ps aux | grep -E "(blink_detector|ScreenBlink)" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+
+echo "macOS cleanup complete"
+rm -f "$0"
+`;
+	
+	const cleanupPath = path.join(os.tmpdir(), 'screenblink_mac_cleanup.sh');
+	
+	try {
+		fs.writeFileSync(cleanupPath, cleanupScript);
+		fs.chmodSync(cleanupPath, '755'); // Make executable
+		console.log(`Cleanup script written to: ${cleanupPath}`);
+		
+		const cleanupProcess = spawn('bash', [cleanupPath], {
+			detached: true,
+			stdio: 'ignore'
+		});
+		
+		cleanupProcess.unref();
+		console.log('Cleanup script started in detached mode');
+		
+	} catch (error) {
+		console.error('Failed to create cleanup script:', error);
+	}
+	
+	// Kill the current process tree
+	await new Promise<void>((resolve) => {
+		exec(`kill -9 ${currentPid}`, (error) => {
+			if (error) {
+				console.log(`Failed to kill main process: ${error.message}`);
+			} else {
+				console.log('Main process killed');
+			}
+			resolve();
+		});
+	});
+	
+	console.log('Nuclear macOS cleanup completed');
 }
 
 // Function to kill all tracked child processes
@@ -354,6 +507,9 @@ async function gracefulShutdown(): Promise<void> {
 		if (process.platform === 'win32') {
 			console.log('Running aggressive Windows cleanup...');
 			await aggressiveWindowsCleanup();
+		} else if (process.platform === 'darwin') {
+			console.log('Running aggressive macOS cleanup...');
+			await aggressiveMacCleanup();
 		} else {
 			await new Promise(resolve => setTimeout(resolve, 500));
 		}
@@ -504,9 +660,15 @@ function createWindow() {
 			// Start graceful shutdown with timeout
 			const shutdownTimeout = setTimeout(() => {
 				console.log('Graceful shutdown timed out, using nuclear option');
-				nuclearWindowsCleanup().then(() => {
-					process.exit(0);
-				});
+				if (process.platform === 'win32') {
+					nuclearWindowsCleanup().then(() => {
+						process.exit(0);
+					});
+				} else if (process.platform === 'darwin') {
+					nuclearMacCleanup().then(() => {
+						process.exit(0);
+					});
+				}
 			}, 5000); 
 			
 			gracefulShutdown().then(() => {
@@ -516,6 +678,11 @@ function createWindow() {
 				if (process.platform === 'win32') {
 					console.log('Using nuclear cleanup to ensure complete termination');
 					nuclearWindowsCleanup().then(() => {
+						process.exit(0);
+					});
+				} else if (process.platform === 'darwin') {
+					console.log('Using nuclear cleanup to ensure complete termination');
+					nuclearMacCleanup().then(() => {
 						process.exit(0);
 					});
 				} else {
@@ -529,9 +696,15 @@ function createWindow() {
 				console.error('Error during graceful shutdown:', error);
 				clearTimeout(shutdownTimeout);
 				// Fallback to nuclear cleanup
-				nuclearWindowsCleanup().then(() => {
-					process.exit(1);
-				});
+				if (process.platform === 'win32') {
+					nuclearWindowsCleanup().then(() => {
+						process.exit(1);
+					});
+				} else if (process.platform === 'darwin') {
+					nuclearMacCleanup().then(() => {
+						process.exit(1);
+					});
+				}
 			});
 		}
 	});
