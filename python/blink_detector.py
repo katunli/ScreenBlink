@@ -27,7 +27,6 @@ target_fps = TARGET_FPS
 processing_resolution = PROCESSING_RESOLUTION
 current_ear_threshold = EAR_THRESHOLD 
 
-# Performance optimization: Cache frequently used JSON strings to reduce serialization overhead
 _cached_json_strings = {
     "no_face_data": json.dumps({"faceData": {
         "faceDetected": False,
@@ -45,33 +44,23 @@ class PreallocatedBuffers:
         self.left_eye = np.zeros((6, 2), dtype=np.int32)
         self.right_eye = np.zeros((6, 2), dtype=np.int32)
         self.temp_frame = None
-        # Pre-allocate arrays for EAR calculation to avoid repeated allocations
         self.ear_diffs = np.zeros((3, 2), dtype=np.float32)
         self.ear_distances = np.zeros(3, dtype=np.float32)
-        # Pre-allocate for concatenated eye landmarks
         self.concatenated_eyes = np.zeros((12, 2), dtype=np.int32)
-        # Pre-allocate normalized landmarks list to avoid repeated list creation
         self.normalized_landmarks = [{"x": 0.0, "y": 0.0} for _ in range(12)]
 
 def calculate_ear_fast(eye_points, buffers):
-    # Optimized EAR calculation using pre-allocated buffers
-    # Reuse pre-allocated arrays to avoid memory allocation overhead
-    buffers.ear_diffs[0] = eye_points[1] - eye_points[5]  # v1: vertical distance 1
-    buffers.ear_diffs[1] = eye_points[2] - eye_points[4]  # v2: vertical distance 2  
-    buffers.ear_diffs[2] = eye_points[0] - eye_points[3]  # h: horizontal distance
+    buffers.ear_diffs[0] = eye_points[1] - eye_points[5]
+    buffers.ear_diffs[1] = eye_points[2] - eye_points[4]
+    buffers.ear_diffs[2] = eye_points[0] - eye_points[3]
     
-    # Vectorized distance calculation - all 3 distances computed simultaneously
     np.sum(buffers.ear_diffs**2, axis=1, out=buffers.ear_distances)
     np.sqrt(buffers.ear_distances, out=buffers.ear_distances)
     
-    # Apply EAR formula: (v1 + v2) / (2 * h) with epsilon to prevent division by zero
-    # Convert to native Python float for JSON serialization
     return float((buffers.ear_distances[0] + buffers.ear_distances[1]) / (2.0 * buffers.ear_distances[2] + 1e-6))
 
-# Performance optimization: Only extract eye landmarks with pre-allocated buffers
 def get_eye_landmarks_only(predictor, gray, face, buffers):
     shape = predictor(gray, face)
-    # Extract only eye points (indices 36-47) directly into pre-allocated buffers
     for i in range(6):
         point = shape.part(36 + i)
         buffers.left_eye[i, 0] = point.x
@@ -83,12 +72,9 @@ def get_eye_landmarks_only(predictor, gray, face, buffers):
     
     return buffers.left_eye, buffers.right_eye
 
-# Optimized frame encoding with cached parameters
-_encode_params = [cv2.IMWRITE_JPEG_QUALITY, 70]  # Cache encode params to avoid recreation
+_encode_params = [cv2.IMWRITE_JPEG_QUALITY, 70]
 def encode_frame(frame):
-    # Encode frame as JPEG with cached parameters for better performance
     _, buffer = cv2.imencode('.jpg', frame, _encode_params)
-    # Convert to base64
     return base64.b64encode(buffer).decode('utf-8')
 
 def find_available_camera():
@@ -385,47 +371,36 @@ def main():
             ret, frame = cap.read()
             if not ret:
                 print(json.dumps({"error": "Failed to read frame"}))
-                # Don't break the process on camera read failures
-                # This can happen during sleep/resume cycles
-                time.sleep(0.1)  # Wait a bit before trying again
+                time.sleep(0.1)
                 continue
             
-            # Optimize frame resizing - only resize if necessary
-            current_shape = frame.shape[:2]  # Cache current shape (height, width)
-            target_shape = processing_resolution[::-1]  # Convert to (height, width)
+            current_shape = frame.shape[:2]
+            target_shape = processing_resolution[::-1]
             if current_shape != target_shape:
                 frame = cv2.resize(frame, processing_resolution)
             
-            # Convert to grayscale for face detection - only once per frame
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
-            # Only run face detection every N frames to reduce CPU usage
             should_detect_face = (frame_count % current_face_detection_skip == 0)
             
             if should_detect_face:
-                # Detect faces using dlib on the full frame
-                # Use smaller detection scale for faster processing
-                faces = detector(gray, 0)  # Scale factor of 1 instead of 0 for speed
+                faces = detector(gray, 0)
                 last_face_detection_time = current_time
                 
-                face_data = default_face_data.copy()  # Use pre-allocated structure
+                face_data = default_face_data.copy()
                 
                 for face in faces:
-                    # Performance optimization: Use optimized landmark extraction
                     left_eye, right_eye = get_eye_landmarks_only(predictor, gray, face, buffers)
                     
-                    # Performance optimization: Use faster EAR calculation
                     left_ear = calculate_ear_fast(left_eye, buffers)
                     right_ear = calculate_ear_fast(right_eye, buffers)
-                    avg_ear = (left_ear + right_ear) / 2.0
+                    avg_ear = (left_ear + right_ear) * 0.5
                     
-                    # Pre-compute frame dimensions to avoid repeated access
                     frame_width = frame.shape[1]
                     frame_height = frame.shape[0]
                     
-                    # Update face data with optimized calculations
                     face_data["faceDetected"] = True
-                    face_data["ear"] = float(avg_ear)  # Ensure native Python float
+                    face_data["ear"] = float(avg_ear)
                     face_data["faceRect"] = {
                         "x": float(face.left() / frame_width),
                         "y": float(face.top() / frame_height),
@@ -433,19 +408,15 @@ def main():
                         "height": float(face.height() / frame_height)
                     }
                     
-                    # Optimized eye landmarks processing using pre-allocated arrays
-                    # Concatenate eyes into pre-allocated buffer
                     buffers.concatenated_eyes[:6] = left_eye
                     buffers.concatenated_eyes[6:] = right_eye
                     
-                    # Reuse pre-allocated normalized landmarks list
                     for i in range(12):
                         buffers.normalized_landmarks[i]["x"] = float(buffers.concatenated_eyes[i, 0] / frame_width)
                         buffers.normalized_landmarks[i]["y"] = float(buffers.concatenated_eyes[i, 1] / frame_height)
                     
                     face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
                     
-                    # Check for blink using current threshold
                     if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
                         last_blink_time = current_time
                         face_data["blink"] = True
@@ -457,26 +428,20 @@ def main():
                         print(json.dumps({"debug": f"Blink detected! EAR: {avg_ear:.3f}, Threshold: {current_ear_threshold:.3f}"}))
                         sys.stdout.flush()
                 
-                # Cache the face data for frames where we don't detect
                 cached_face_data = face_data
             else:
-                # Use cached face data for frames where we skip detection
                 face_data = cached_face_data if cached_face_data else default_face_data
             
-            # Send face tracking data - use cached JSON for performance when no face detected
             if face_data.get("faceDetected", False):
                 print(json.dumps({"faceData": face_data}))
             else:
                 print(_cached_json_strings["no_face_data"])
             sys.stdout.flush()
             
-            # Send video frame every 3 frames if enabled (and only if we have a face)
             if SEND_VIDEO and frame_count % 3 == 0 and face_data.get("faceDetected", False):
-                # Avoid redundant resize if already at target resolution
                 if processing_resolution == (640, 480):
                     frame_base64 = encode_frame(frame)
                 else:
-                    # Resize back to original resolution for display if needed
                     display_frame = cv2.resize(frame, (640, 480))
                     frame_base64 = encode_frame(display_frame)
                 
