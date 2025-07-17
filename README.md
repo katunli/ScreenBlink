@@ -1,6 +1,6 @@
 # ScreenBlink
 
-A desktop application to help prevent dry eyes by reminding users to blink regularly.
+A desktop application to help prevent dry eyes and eye strain by reminding users to blink regularly and take breaks.
 
 ## Features
 
@@ -12,8 +12,4 @@ A desktop application to help prevent dry eyes by reminding users to blink regul
 
 ## Installation
 
-### Windows
-Download the latest release from the [Releases](https://github.com/katunli/ScreenBlink/releases) page.
-
-### macOS
-Download the latest release from the [Releases](https://github.com/katunli/ScreenBlink/releases) page.
+Download the latest release from the [Website](https://screenblink.vercel.app/)
