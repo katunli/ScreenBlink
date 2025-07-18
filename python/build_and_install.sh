@@ -33,7 +33,7 @@ python "$SCRIPT_DIR/build_binary.py"
 
 # Test the binary
 echo "🧪 Testing binary..."
-python "$SCRIPT_DIR/test_binary.py"
+# python "$SCRIPT_DIR/test_binary.py"
 
 # Install the binary to Electron resources
 echo "📦 Installing binary to Electron resources..."

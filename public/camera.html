@@ -73,6 +73,26 @@
     const info = document.getElementById('info');
 
     let lastFaceData = null;
+    let lastBlinkTime = 0;
+    let blinkDisplayTimer = null;
+
+    // Function to reset blink display
+    function resetBlinkDisplay() {
+      if (lastFaceData && lastFaceData.faceDetected) {
+        const eyeSize = lastFaceData.ear || 0;
+        status.textContent = 'Eye size: ' + eyeSize.toFixed(3);
+        status.style.background = 'rgba(0, 0, 0, 0.7)';
+        
+        info.innerHTML = `
+          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
+          <div>• Your eye size is measured continuously</div>
+          <div>• When eye size goes below your threshold → Blink detected</div>
+          <div>• Green box = Blink detected</div>
+          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSize.toFixed(3)}</div>
+        `;
+        info.style.background = 'rgba(0, 0, 0, 0.7)';
+      }
+    }
 
     // Draw face tracking overlays
     function drawOverlays(faceData) {
@@ -105,9 +125,13 @@
         }
         ctx.restore();
         
+        // Check if we should still be showing blink detection
+        const timeSinceLastBlink = Date.now() - lastBlinkTime;
+        const shouldShowBlink = timeSinceLastBlink < 350; // 350ms display duration
+        
         // Update status with simple language
         const eyeSize = faceData.ear || 0;
-        const isBlinking = faceData.blink || false;
+        const isBlinking = faceData.blink || shouldShowBlink;
         
         status.textContent = isBlinking ? 'BLINK DETECTED!' : 'Eye size: ' + eyeSize.toFixed(3);
         status.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
@@ -138,6 +162,55 @@
     // Listen for face tracking data
     ipcRenderer.on('face-tracking-data', (event, data) => {
       lastFaceData = data;
+      
+      // Check if we should still be showing blink detection
+      const timeSinceLastBlink = Date.now() - lastBlinkTime;
+      const shouldShowBlink = timeSinceLastBlink < 350; // 350ms display duration
+      
+      if (data.faceDetected) {
+        const eyeSize = data.ear || 0;
+        const isBlinking = data.blink || shouldShowBlink;
+        
+        status.textContent = isBlinking ? 'BLINK DETECTED!' : 'Eye size: ' + eyeSize.toFixed(3);
+        status.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
+        
+        info.innerHTML = `
+          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
+          <div>• Your eye size is measured continuously</div>
+          <div>• When eye size goes below your threshold → Blink detected</div>
+          <div>• Green box = Blink detected</div>
+          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSize.toFixed(3)}</div>
+        `;
+        info.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
+      }
+    });
+
+    // Listen for immediate blink detection events
+    ipcRenderer.on('blink-detected', (event, blinkData) => {
+      lastBlinkTime = Date.now();
+      
+      // Clear any existing timer
+      if (blinkDisplayTimer) {
+        clearTimeout(blinkDisplayTimer);
+      }
+      
+      // Immediately update the UI to show blink detection
+      if (lastFaceData && lastFaceData.faceDetected) {
+        status.textContent = 'BLINK DETECTED!';
+        status.style.background = 'rgba(0, 255, 0, 0.8)';
+        
+        info.innerHTML = `
+          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
+          <div>• Your eye size is measured continuously</div>
+          <div>• When eye size goes below your threshold → Blink detected</div>
+          <div>• Green box = Blink detected</div>
+          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${blinkData.ear.toFixed(3)}</div>
+        `;
+        info.style.background = 'rgba(0, 255, 0, 0.8)';
+      }
+      
+      // Set timer to reset display after 350ms
+      blinkDisplayTimer = setTimeout(resetBlinkDisplay, 350);
     });
 
     // Handle video stream (draw JPEG directly to canvas, then overlay face data)

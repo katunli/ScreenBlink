@@ -9,7 +9,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'camera-error',
       'video-stream',
       'camera-window-closed',
-      'update-message'
+      'update-message',
+      'face-tracking-data',
+      'blink-detected'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => func(...args));

@@ -1179,6 +1179,14 @@ function startBlinkDetector() {
 						console.log('Popup already destroyed');
 						currentPopup = null;
 					}
+					
+					// Send blink event to camera window for immediate UI update
+					if (cameraWindow && !cameraWindow.isDestroyed()) {
+						cameraWindow.webContents.send('blink-detected', {
+							ear: parsed.ear,
+							time: parsed.time
+						});
+					}
 				} else if (parsed.error) {
 					console.error('Blink detector error:', parsed.error);
 					// Send error to renderer for display in dev tools

@@ -16,6 +16,7 @@ BLINK_COOLDOWN = 0.3  # seconds
 TARGET_FPS = 15
 FACE_DETECTION_SKIP = 1  # Only run face detection every 3rd frame
 PROCESSING_RESOLUTION = (320, 240) 
+BLINK_DISPLAY_DURATION = 0.35  # How long to show blink detection in UI (seconds)
 
 # Global variables
 SEND_VIDEO = False
@@ -26,6 +27,7 @@ current_face_detection_skip = FACE_DETECTION_SKIP
 target_fps = TARGET_FPS
 processing_resolution = PROCESSING_RESOLUTION
 current_ear_threshold = EAR_THRESHOLD 
+last_blink_display_time = 0.0  # Track when blink was last detected for UI display
 
 _cached_json_strings = {
     "no_face_data": json.dumps({"faceData": {
@@ -296,7 +298,7 @@ def process_commands():
             sys.stdout.flush()
 
 def main():
-    global SEND_VIDEO, CAMERA_ACTIVE, cap, current_ear_threshold  # Add current_ear_threshold to global declaration
+    global SEND_VIDEO, CAMERA_ACTIVE, cap, current_ear_threshold, last_blink_display_time  # Add current_ear_threshold to global declaration
     
     print(json.dumps({"status": "Starting blink detector in standby mode..."}))
     sys.stdout.flush()
@@ -417,8 +419,12 @@ def main():
                     
                     face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
                     
+                    # Check if we should show blink detection in UI
+                    should_show_blink = (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION
+                    
                     if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
                         last_blink_time = current_time
+                        last_blink_display_time = current_time
                         face_data["blink"] = True
                         print(json.dumps({
                             "blink": True,
@@ -427,10 +433,20 @@ def main():
                         }))
                         print(json.dumps({"debug": f"Blink detected! EAR: {avg_ear:.3f}, Threshold: {current_ear_threshold:.3f}"}))
                         sys.stdout.flush()
+                    elif should_show_blink:
+                        # Keep showing blink detection for the display duration
+                        face_data["blink"] = True
                 
                 cached_face_data = face_data
             else:
+                # Use cached face data but check if we should still show blink detection
                 face_data = cached_face_data if cached_face_data else default_face_data
+                
+                # Check if we should still show blink detection from previous detection
+                if face_data.get("faceDetected", False):
+                    should_show_blink = (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION
+                    if should_show_blink:
+                        face_data["blink"] = True
             
             if face_data.get("faceDetected", False):
                 print(json.dumps({"faceData": face_data}))
