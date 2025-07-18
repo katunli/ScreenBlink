@@ -127,7 +127,7 @@
         
         // Check if we should still be showing blink detection
         const timeSinceLastBlink = Date.now() - lastBlinkTime;
-        const shouldShowBlink = timeSinceLastBlink < 350; // 350ms display duration
+        const shouldShowBlink = timeSinceLastBlink < 350; 
         
         // Update status with simple language
         const eyeSize = faceData.ear || 0;
@@ -209,7 +209,6 @@
         info.style.background = 'rgba(0, 255, 0, 0.8)';
       }
       
-      // Set timer to reset display after 350ms
       blinkDisplayTimer = setTimeout(resetBlinkDisplay, 350);
     });
 

@@ -13,10 +13,10 @@ import base64
 # Constants
 EAR_THRESHOLD = 0.20  # Default value
 BLINK_COOLDOWN = 0.3  # seconds
-TARGET_FPS = 15
-FACE_DETECTION_SKIP = 1  # Only run face detection every 3rd frame
+TARGET_FPS = 10
+FACE_DETECTION_SKIP = 1 
 PROCESSING_RESOLUTION = (320, 240) 
-BLINK_DISPLAY_DURATION = 0.35  # How long to show blink detection in UI (seconds)
+BLINK_DISPLAY_DURATION = 0.35  # seconds
 
 # Global variables
 SEND_VIDEO = False
@@ -176,14 +176,11 @@ def start_camera():
                     sys.stdout.flush()
                     return False
             
-            # Set resolution to efficient processing resolution
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, processing_resolution[0])
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, processing_resolution[1])
             
-            # Set frame rate to efficient target FPS
             cap.set(cv2.CAP_PROP_FPS, target_fps)
             
-            # Verify resolution was set
             actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
             actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
             actual_fps = cap.get(cv2.CAP_PROP_FPS)
@@ -335,11 +332,9 @@ def main():
     last_face_detection_time = 0
     cached_face_data = None
     
-    # Calculate frame interval for target FPS
     frame_interval = 1.0 / target_fps
     last_frame_time = time.time()
     
-    # Pre-allocate face data structure to reduce memory allocations
     default_face_data = {
         "faceDetected": False,
         "ear": 0.0,
