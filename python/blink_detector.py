@@ -12,9 +12,9 @@ import base64
 
 # Constants
 EAR_THRESHOLD = 0.20  # Default value
-BLINK_COOLDOWN = 0.5  # seconds
-TARGET_FPS = 10  
-FACE_DETECTION_SKIP = 3  # Only run face detection every 3rd frame
+BLINK_COOLDOWN = 0.3  # seconds
+TARGET_FPS = 15
+FACE_DETECTION_SKIP = 1  # Only run face detection every 3rd frame
 PROCESSING_RESOLUTION = (320, 240) 
 
 # Global variables
