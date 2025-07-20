@@ -63,6 +63,7 @@
       <div>• When eye size goes below your threshold → Blink detected</div>
       <div>• Green box = Blink detected</div>
       <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: 0.000</div>
+      <div><strong>Threshold:</strong> 0.200</div>
     </div>
   </div>
   <script>
@@ -75,6 +76,24 @@
     let lastFaceData = null;
     let lastBlinkTime = 0;
     let blinkDisplayTimer = null;
+    let currentThreshold = 0.20; // Default threshold value
+    let thresholdUpdateTimer = null; // For debouncing threshold updates
+
+    // Function to update the info display with current eye size and threshold
+    function updateInfoDisplay(eyeSize, isBlinking = false) {
+      const eyeSizeText = eyeSize !== null ? eyeSize.toFixed(3) : '0.000';
+      const thresholdText = currentThreshold.toFixed(3);
+      
+      info.innerHTML = `
+        <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
+        <div>• Your eye size is measured continuously</div>
+        <div>• When eye size goes below your threshold → Blink detected</div>
+        <div>• Green box = Blink detected</div>
+        <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSizeText}</div>
+        <div><strong>Threshold:</strong> ${thresholdText}</div>
+      `;
+      info.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
+    }
 
     // Function to reset blink display
     function resetBlinkDisplay() {
@@ -82,15 +101,7 @@
         const eyeSize = lastFaceData.ear || 0;
         status.textContent = 'Eye size: ' + eyeSize.toFixed(3);
         status.style.background = 'rgba(0, 0, 0, 0.7)';
-        
-        info.innerHTML = `
-          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
-          <div>• Your eye size is measured continuously</div>
-          <div>• When eye size goes below your threshold → Blink detected</div>
-          <div>• Green box = Blink detected</div>
-          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSize.toFixed(3)}</div>
-        `;
-        info.style.background = 'rgba(0, 0, 0, 0.7)';
+        updateInfoDisplay(eyeSize);
       }
     }
 
@@ -137,25 +148,11 @@
         status.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
         
         // Update info box
-        info.innerHTML = `
-          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
-          <div>• Your eye size is measured continuously</div>
-          <div>• When eye size goes below your threshold → Blink detected</div>
-          <div>• Green box = Blink detected</div>
-          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSize.toFixed(3)}</div>
-        `;
-        info.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
+        updateInfoDisplay(eyeSize, isBlinking);
       } else {
         status.textContent = 'No face detected';
         status.style.background = 'rgba(255, 0, 0, 0.7)';
-        info.innerHTML = `
-          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
-          <div>• Your eye size is measured continuously</div>
-          <div>• When eye size goes below your threshold → Blink detected</div>
-          <div>• Green box = Blink detected</div>
-          <div style="margin-top: 8px;"><strong>Current:</strong> No face detected</div>
-        `;
-        info.style.background = 'rgba(255, 0, 0, 0.7)';
+        updateInfoDisplay(null);
       }
     }
 
@@ -174,14 +171,7 @@
         status.textContent = isBlinking ? 'BLINK DETECTED!' : 'Eye size: ' + eyeSize.toFixed(3);
         status.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
         
-        info.innerHTML = `
-          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
-          <div>• Your eye size is measured continuously</div>
-          <div>• When eye size goes below your threshold → Blink detected</div>
-          <div>• Green box = Blink detected</div>
-          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${eyeSize.toFixed(3)}</div>
-        `;
-        info.style.background = isBlinking ? 'rgba(0, 255, 0, 0.8)' : 'rgba(0, 0, 0, 0.7)';
+        updateInfoDisplay(eyeSize, isBlinking);
       }
     });
 
@@ -199,17 +189,24 @@
         status.textContent = 'BLINK DETECTED!';
         status.style.background = 'rgba(0, 255, 0, 0.8)';
         
-        info.innerHTML = `
-          <div style="margin-bottom: 8px;"><strong>How it works:</strong></div>
-          <div>• Your eye size is measured continuously</div>
-          <div>• When eye size goes below your threshold → Blink detected</div>
-          <div>• Green box = Blink detected</div>
-          <div style="margin-top: 8px;"><strong>Current:</strong> Eye size: ${blinkData.ear.toFixed(3)}</div>
-        `;
-        info.style.background = 'rgba(0, 255, 0, 0.8)';
+        updateInfoDisplay(blinkData.ear, true);
       }
       
       blinkDisplayTimer = setTimeout(resetBlinkDisplay, 350);
+    });
+
+    // Listen for threshold updates from the main process
+    ipcRenderer.on('threshold-updated', (event, newThreshold) => {
+      // Clear any existing threshold update timer
+      if (thresholdUpdateTimer) {
+        clearTimeout(thresholdUpdateTimer);
+      }
+      
+      // Set a new timeout to update the display after 200ms of no changes
+      thresholdUpdateTimer = setTimeout(() => {
+        currentThreshold = newThreshold;
+        updateInfoDisplay(lastFaceData ? lastFaceData.ear : null); // Update info display with current eye size
+      }, 200);
     });
 
     // Handle video stream (draw JPEG directly to canvas, then overlay face data)
@@ -234,6 +231,9 @@
 
     // Request video stream when window is ready
     ipcRenderer.send('request-video-stream');
+    
+    // Initialize the info display with current threshold
+    updateInfoDisplay(null);
   </script>
 </body>
 </html> 

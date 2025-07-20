@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'camera-window-closed',
       'update-message',
       'face-tracking-data',
-      'blink-detected'
+      'blink-detected',
+      'threshold-updated'
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => func(...args));

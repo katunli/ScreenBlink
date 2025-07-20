@@ -93,6 +93,7 @@ let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
 let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
+let cameraThresholdUpdateTimeout: NodeJS.Timeout | null = null;
 const FRAME_SKIP = 3; 
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
@@ -466,6 +467,10 @@ async function gracefulShutdown(): Promise<void> {
 		if (earThresholdUpdateTimeout) {
 			clearTimeout(earThresholdUpdateTimeout);
 			earThresholdUpdateTimeout = null;
+		}
+		if (cameraThresholdUpdateTimeout) {
+			clearTimeout(cameraThresholdUpdateTimeout);
+			cameraThresholdUpdateTimeout = null;
 		}
 		
 		blinkReminderActive = false;
@@ -1059,6 +1064,11 @@ function showCameraWindow() {
 	cameraWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'camera.html'));
 	
 	cameraWindow.webContents.on('did-finish-load', () => {
+		// Send current threshold to camera window
+		if (cameraWindow && !cameraWindow.isDestroyed()) {
+			cameraWindow.webContents.send('threshold-updated', preferences.blinkSensitivity);
+		}
+		
 		// Request video stream from blink detector process
 		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
 			blinkDetectorProcess.stdin.write(JSON.stringify({ 
@@ -1536,12 +1546,25 @@ ipcMain.on("update-blink-sensitivity", (_event, sensitivity: number) => {
 	preferences.blinkSensitivity = sensitivity;
 	store.set('blinkSensitivity', sensitivity);
 	
-	// Clear any existing timeout
+	// Clear any existing camera window update timeout
+	if (cameraThresholdUpdateTimeout) {
+		clearTimeout(cameraThresholdUpdateTimeout);
+	}
+	
+	// Set a new timeout to update the camera window after 300ms of no changes
+	cameraThresholdUpdateTimeout = setTimeout(() => {
+		// Send threshold update to camera window if it's open
+		if (cameraWindow && !cameraWindow.isDestroyed()) {
+			cameraWindow.webContents.send('threshold-updated', sensitivity);
+		}
+	}, 300);
+	
+	// Clear any existing Python process update timeout
 	if (earThresholdUpdateTimeout) {
 		clearTimeout(earThresholdUpdateTimeout);
 	}
 	
-	// Set a new timeout to update the threshold after 500ms of no changes
+	// Set a new timeout to update the Python process after 500ms of no changes
 	earThresholdUpdateTimeout = setTimeout(() => {
 		// Send the new threshold to the Python process if it's running
 		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
