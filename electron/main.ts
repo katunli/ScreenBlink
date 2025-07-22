@@ -1006,38 +1006,49 @@ function ensureNoReminderActivity() {
 
 function registerGlobalShortcut(shortcut: string) {
 	globalShortcut.unregisterAll();
-	globalShortcut.register(shortcut, () => {
-		console.log('Keyboard shortcut pressed, current tracking state:', preferences.isTracking);
-		
-		if (isAutoResuming) {
-			console.log('User action detected during auto-resuming, stopping auto-resume and taking priority');
-			isAutoResuming = false;
-			ensureNoReminderActivity();
-		}
-		
-		if (preferences.isTracking) {
-			console.log('Stopping reminders via keyboard shortcut...');
-			ensureNoReminderActivity();
-			showStoppedPopup();
-		} else {
-			console.log('Starting reminders via keyboard shortcut...');
+	try {
+		const success = globalShortcut.register(shortcut, () => {
+			console.log('Keyboard shortcut pressed, current tracking state:', preferences.isTracking);
 			
-			ensureNoReminderActivity();
-			
-			preferences.isTracking = true;
-			
-			if (preferences.cameraEnabled) {
-				startCameraMonitoring();
-			} else {
-				startBlinkReminderLoop(preferences.reminderInterval);
+			if (isAutoResuming) {
+				console.log('User action detected during auto-resuming, stopping auto-resume and taking priority');
+				isAutoResuming = false;
+				ensureNoReminderActivity();
 			}
-		}
-		
-		win?.webContents.send('load-preferences', {
-			...preferences,
-			reminderInterval: preferences.reminderInterval / 1000
+			
+			if (preferences.isTracking) {
+				console.log('Stopping reminders via keyboard shortcut...');
+				ensureNoReminderActivity();
+				showStoppedPopup();
+			} else {
+				console.log('Starting reminders via keyboard shortcut...');
+				
+				ensureNoReminderActivity();
+				
+				preferences.isTracking = true;
+				
+				if (preferences.cameraEnabled) {
+					startCameraMonitoring();
+				} else {
+					startBlinkReminderLoop(preferences.reminderInterval);
+				}
+			}
+			
+			win?.webContents.send('load-preferences', {
+				...preferences,
+				reminderInterval: preferences.reminderInterval / 1000
+			});
 		});
-	});
+		if (!success) {
+			console.error('Failed to register global shortcut:', shortcut);
+			win?.webContents.send('shortcut-error', shortcut);
+		} else {
+			win?.webContents.send('shortcut-error', null);
+		}
+	} catch (err) {
+		console.error('Error registering global shortcut:', shortcut, err);
+		win?.webContents.send('shortcut-error', shortcut);
+	}
 }
 
 function showCameraWindow() {
@@ -1905,7 +1916,7 @@ app.whenReady().then(() => {
 	if (!isBlinkDetectorRunning) {
 		console.log('Starting blink detector on app startup...');
 		startBlinkDetector();
-	} else {
+	} else {  
 		console.log('Blink detector already running on app startup');
 	}
 });

@@ -110,6 +110,21 @@ export default function ScreenBlinkHomepage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleShortcutError = (_event: any, shortcut: string | null) => {
+      if (shortcut) {
+        setShortcutError('Invalid shortcut: ' + shortcut + '. Please use only ASCII characters and valid combinations.');
+        setIsRecordingShortcut(true);
+      } else {
+        setShortcutError('');
+      }
+    };
+    window.ipcRenderer?.on('shortcut-error', handleShortcutError);
+    return () => {
+      window.ipcRenderer?.off('shortcut-error', handleShortcutError);
+    };
+  }, []);
+
   const validateShortcut = useCallback((shortcut: string): boolean => {
     if (!shortcut) return false;
     const parts = shortcut.split('+');
@@ -117,7 +132,13 @@ export default function ScreenBlinkHomepage() {
     return true;
   }, []);
 
+  const isAscii = (str: string) => /^[\x00-\x7F]*$/.test(str);
+
   const handleSaveShortcut = useCallback(() => {
+    if (!isAscii(tempShortcut)) {
+      setShortcutError('Shortcut must only contain ASCII characters.');
+      return;
+    }
     if (validateShortcut(tempShortcut)) {
       setPreferences(prev => ({ ...prev, keyboardShortcut: tempShortcut }));
       setIsRecordingShortcut(false);
