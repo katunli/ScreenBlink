@@ -77,7 +77,9 @@ jobs:
             Latest Release Download Counts
 
             DMG Downloads:
-            ${{ env.DMG }} (Up ${{ env.DIFF_DMG }} since last email)
+            Total: ${{ env.DMG }}
+            Up ${{ env.DIFF_DMG }} since last email
 
             EXE Downloads:
-            ${{ env.EXE }} (Up ${{ env.DIFF_EXE }} since last email)
+            Total: ${{ env.EXE }}
+            Up ${{ env.DIFF_EXE }} since last email
