@@ -2,25 +2,66 @@ name: Daily Download Report
 
 on:
   schedule:
-    - cron: '0 8 * * *' # Runs every day at 8:00 UTC
+    - cron: '0 18 * * *' # Runs every day at 18:00 UTC (1pm EST)
   workflow_dispatch:
 
 jobs:
   report:
     runs-on: ubuntu-latest
     steps:
+      - name: Restore previous download counts
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: prev_counts.txt
+          key: download-counts
+          restore-keys: |
+            download-counts
+
       - name: Get latest release asset download counts
         id: get_downloads
         run: |
           REPO="${{ github.repository }}"
-          # Get the latest release
           RELEASE=$(curl -s -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/$REPO/releases/latest)
-          # Extract .dmg and .exe assets and their download counts
           DMG=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".dmg")) | "\(.name): \(.download_count)"')
           EXE=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".exe")) | "\(.name): \(.download_count)"')
           echo "DMG=$DMG" >> $GITHUB_ENV
           echo "EXE=$EXE" >> $GITHUB_ENV
+
+          # Save current counts to file
+          echo "$DMG" > prev_counts.txt
+          echo "$EXE" >> prev_counts.txt
+
+      - name: Calculate difference from previous run
+        id: diff
+        run: |
+          # Set default previous values
+          PREV_DMG=0
+          PREV_EXE=0
+
+          # Read previous counts if file exists
+          if [ -f prev_counts.txt ]; then
+            PREV_DMG=$(head -n 1 prev_counts.txt | grep -o '[0-9]\+$' || echo 0)
+            PREV_EXE=$(tail -n 1 prev_counts.txt | grep -o '[0-9]\+$' || echo 0)
+          fi
+
+          CURR_DMG=$(echo "${{ env.DMG }}" | grep -o '[0-9]\+$' || echo 0)
+          CURR_EXE=$(echo "${{ env.EXE }}" | grep -o '[0-9]\+$' || echo 0)
+
+          DIFF_DMG=$((CURR_DMG - PREV_DMG))
+          DIFF_EXE=$((CURR_EXE - PREV_EXE))
+
+          echo "DIFF_DMG=$DIFF_DMG" >> $GITHUB_ENV
+          echo "DIFF_EXE=$DIFF_EXE" >> $GITHUB_ENV
+
+      - name: Save new counts to cache
+        uses: actions/cache@v4
+        with:
+          path: prev_counts.txt
+          key: download-counts-${{ github.run_number }}
+          restore-keys: |
+            download-counts
 
       - name: Send email with download counts
         uses: dawidd6/action-send-mail@v3
@@ -36,7 +77,7 @@ jobs:
             Latest Release Download Counts
 
             DMG Downloads:
-            ${{ env.DMG }}
+            ${{ env.DMG }} (Up ${{ env.DIFF_DMG }} since last email)
 
             EXE Downloads:
-            ${{ env.EXE }}
+            ${{ env.EXE }} (Up ${{ env.DIFF_EXE }} since last email)
