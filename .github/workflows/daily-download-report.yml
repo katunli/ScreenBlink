@@ -1,0 +1,42 @@
+name: Daily Download Report
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Runs every day at 8:00 UTC
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest release asset download counts
+        id: get_downloads
+        run: |
+          REPO="${{ github.repository }}"
+          # Get the latest release
+          RELEASE=$(curl -s -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/releases/latest)
+          # Extract .dmg and .exe assets and their download counts
+          DMG=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".dmg")) | "\(.name): \(.download_count)"')
+          EXE=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".exe")) | "\(.name): \(.download_count)"')
+          echo "DMG=$DMG" >> $GITHUB_ENV
+          echo "EXE=$EXE" >> $GITHUB_ENV
+
+      - name: Send email with download counts
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Daily Download Report for Latest Release"
+          to: katunjieli@gmail.com
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            Latest Release Download Counts
+
+            DMG Downloads:
+            ${{ env.DMG }}
+
+            EXE Downloads:
+            ${{ env.EXE }}
