@@ -47,7 +47,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,
 	popupPosition: "top-right",
-	popupSize: { width: 220, height: 80 },
+	popupSize: { width: 300, height: 120 },
 	popupColors: {
 		background: "#FFFFFF",
 		text: "#00FF40",

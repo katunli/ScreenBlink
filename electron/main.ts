@@ -125,7 +125,7 @@ const preferences = {
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
 	exerciseInterval: store.get('exerciseInterval', 20) as number, // minutes
 	popupPosition: null as { x: number, y: number } | null, // Will be set after app is ready
-	popupSize: store.get('popupSize', { width: 220, height: 80 }) as { width: number, height: number },
+	popupSize: store.get('popupSize', { width: 300, height: 120 }) as { width: number, height: number },
 	popupColors: store.get('popupColors', {
 		background: '#FFFFFF',
 		text: '#00FF11',
@@ -751,7 +751,7 @@ function showStartingPopup() {
 	}
 
 	if (!preferences.popupPosition) {
-		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		preferences.popupPosition = getCenteredPopupPosition(300, 120);
 	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
@@ -812,7 +812,7 @@ function showBlinkPopup() {
 	playNotificationSound('blink');
 
 	if (!preferences.popupPosition) {
-		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		preferences.popupPosition = getCenteredPopupPosition(300, 120);
 	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
@@ -877,7 +877,7 @@ function showStoppedPopup() {
 	}
 
 	if (!preferences.popupPosition) {
-		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		preferences.popupPosition = getCenteredPopupPosition(300, 120);
 	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
@@ -1926,7 +1926,7 @@ app.whenReady().then(() => {
 	
 	// Set popupPosition to center if not present in store
 	if (!store.has('popupPosition')) {
-		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		preferences.popupPosition = getCenteredPopupPosition(300, 120);
 		store.set('popupPosition', preferences.popupPosition);
 	} else {
 		preferences.popupPosition = store.get('popupPosition') as { x: number, y: number };
@@ -1974,7 +1974,7 @@ function showPopupEditor() {
 	const width = preferences.popupSize.width;
 	const height = preferences.popupSize.height;
 	if (!preferences.popupPosition) {
-		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		preferences.popupPosition = getCenteredPopupPosition(300, 120);
 	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
@@ -2073,8 +2073,8 @@ ipcMain.on('reset-preferences', () => {
   preferences.cameraEnabled = false;
   preferences.eyeExercisesEnabled = true;
   preferences.exerciseInterval = 20;
-  preferences.popupPosition = getCenteredPopupPosition(220, 80);
-  preferences.popupSize = { width: 220, height: 80 };
+  preferences.popupPosition = getCenteredPopupPosition(300, 120);
+  preferences.popupSize = { width: 300, height: 120 };
   preferences.popupColors = {
     background: '#FFFFFF',
     text: '#00FF11',
