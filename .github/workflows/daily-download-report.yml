@@ -26,12 +26,11 @@ jobs:
             https://api.github.com/repos/$REPO/releases/latest)
           DMG=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".dmg")) | "\(.name): \(.download_count)"')
           EXE=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".exe")) | "\(.name): \(.download_count)"')
+          CURR_DMG=$(echo "$DMG" | grep -o '[0-9]\+$' 2>/dev/null || echo 0)
+          CURR_EXE=$(echo "$EXE" | grep -o '[0-9]\+$' 2>/dev/null || echo 0)
+          CURR_TOTAL=$((CURR_DMG + CURR_EXE))
           echo "DMG=$DMG" >> $GITHUB_ENV
           echo "EXE=$EXE" >> $GITHUB_ENV
-
-          CURR_DMG=$(echo "$DMG" | grep -o '[0-9]\+$' || echo 0)
-          CURR_EXE=$(echo "$EXE" | grep -o '[0-9]\+$' || echo 0)
-          CURR_TOTAL=$((CURR_DMG + CURR_EXE))
           echo "CURR_DMG=$CURR_DMG" >> $GITHUB_ENV
           echo "CURR_EXE=$CURR_EXE" >> $GITHUB_ENV
           echo "CURR_TOTAL=$CURR_TOTAL" >> $GITHUB_ENV
@@ -46,11 +45,11 @@ jobs:
           YESTERDAY_EXE=0
           MONDAY_DMG=0
           MONDAY_EXE=0
-          if [ -f prev_counts.json ]; then
-            YESTERDAY_DMG=$(jq -r '.yesterday.dmg' prev_counts.json)
-            YESTERDAY_EXE=$(jq -r '.yesterday.exe' prev_counts.json)
-            MONDAY_DMG=$(jq -r '.monday.dmg' prev_counts.json)
-            MONDAY_EXE=$(jq -r '.monday.exe' prev_counts.json)
+          if [ -f prev_counts.json ] && jq empty prev_counts.json 2>/dev/null; then
+            YESTERDAY_DMG=$(jq -r '.yesterday.dmg' prev_counts.json 2>/dev/null)
+            YESTERDAY_EXE=$(jq -r '.yesterday.exe' prev_counts.json 2>/dev/null)
+            MONDAY_DMG=$(jq -r '.monday.dmg' prev_counts.json 2>/dev/null)
+            MONDAY_EXE=$(jq -r '.monday.exe' prev_counts.json 2>/dev/null)
           fi
           CURR_DMG=${{ env.CURR_DMG }}
           CURR_EXE=${{ env.CURR_EXE }}
@@ -80,9 +79,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prev_counts.json
-          key: download-counts-${{ github.run_number }}
-          restore-keys: |
-            download-counts
+          key: download-counts
 
       - name: Send email with download counts
         uses: dawidd6/action-send-mail@v3
