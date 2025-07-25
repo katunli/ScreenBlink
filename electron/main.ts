@@ -2134,7 +2134,7 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 		});
 		
 		// Listen for the audio finished event and close the window
-		soundWindow.webContents.on('ipc-message', (event, channel) => {
+		soundWindow.webContents.on('ipc-message', (_event, channel) => {
 			if (channel === 'audio-finished') {
 				if (!soundWindow.isDestroyed()) {
 					soundWindow.close();

@@ -411,9 +411,10 @@ export default function ScreenBlinkHomepage() {
 									</div>
 								</div>
 								<p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">
-									Show reminder if you haven't blinked for{" "}
-									{preferences.reminderInterval} second
-									{preferences.reminderInterval !== 1 ? "s" : ""}
+									{preferences.cameraEnabled
+										? `Show reminder if you haven't blinked for ${preferences.reminderInterval} second${preferences.reminderInterval !== 1 ? "s" : ""}`
+										: `Show reminder every ${preferences.reminderInterval} second${preferences.reminderInterval !== 1 ? "s" : ""}`
+									}
 								</p>
 							</div>
 
