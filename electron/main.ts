@@ -108,13 +108,23 @@ let popupEditorWindow: BrowserWindow | null = null;
 let isQuitting = false;
 let childProcesses = new Set<any>();
 
+// Function to calculate centered popup position
+function getCenteredPopupPosition(popupWidth: number, popupHeight: number) {
+	const display = screen.getPrimaryDisplay();
+	const { width, height } = display.workAreaSize;
+	return {
+		x: Math.floor((width - popupWidth) / 2),
+		y: Math.floor((height - popupHeight) / 2)
+	};
+}
+
 const preferences = {
 	darkMode: store.get('darkMode', true) as boolean,
-	reminderInterval: store.get('reminderInterval', 5000) as number,
+	reminderInterval: store.get('reminderInterval', 3000) as number, // 3 seconds
 	cameraEnabled: store.get('cameraEnabled', false) as boolean,
 	eyeExercisesEnabled: store.get('eyeExercisesEnabled', true) as boolean,
 	exerciseInterval: store.get('exerciseInterval', 20) as number, // minutes
-	popupPosition: store.get('popupPosition', { x: 40, y: 40 }) as { x: number, y: number },
+	popupPosition: null as { x: number, y: number } | null, // Will be set after app is ready
 	popupSize: store.get('popupSize', { width: 220, height: 80 }) as { width: number, height: number },
 	popupColors: store.get('popupColors', {
 		background: '#FFFFFF',
@@ -739,7 +749,10 @@ function showStartingPopup() {
 		currentPopup.close();
 		currentPopup = null;
 	}
-	
+
+	if (!preferences.popupPosition) {
+		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -797,7 +810,10 @@ function showBlinkPopup() {
 	}
 	
 	playNotificationSound('blink');
-	
+
+	if (!preferences.popupPosition) {
+		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -860,6 +876,9 @@ function showStoppedPopup() {
 		currentPopup = null;
 	}
 
+	if (!preferences.popupPosition) {
+		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -1905,6 +1924,14 @@ app.whenReady().then(() => {
 	createWindow();
 	registerGlobalShortcut(preferences.keyboardShortcut);
 	
+	// Set popupPosition to center if not present in store
+	if (!store.has('popupPosition')) {
+		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+		store.set('popupPosition', preferences.popupPosition);
+	} else {
+		preferences.popupPosition = store.get('popupPosition') as { x: number, y: number };
+	}
+	
 	// Reset exercise timer when app starts
 	store.set('lastExerciseTime', Date.now());
 	
@@ -1946,6 +1973,9 @@ function showPopupEditor() {
 
 	const width = preferences.popupSize.width;
 	const height = preferences.popupSize.height;
+	if (!preferences.popupPosition) {
+		preferences.popupPosition = getCenteredPopupPosition(220, 80);
+	}
 	const x = preferences.popupPosition.x;
 	const y = preferences.popupPosition.y;
 
@@ -2039,11 +2069,11 @@ ipcMain.on('reset-preferences', () => {
   
   // Reset preferences to defaults
   preferences.darkMode = true;
-  preferences.reminderInterval = 5000;
+  preferences.reminderInterval = 3000; // 3 seconds
   preferences.cameraEnabled = false;
   preferences.eyeExercisesEnabled = true;
   preferences.exerciseInterval = 20;
-  preferences.popupPosition = { x: 40, y: 40 };
+  preferences.popupPosition = getCenteredPopupPosition(220, 80);
   preferences.popupSize = { width: 220, height: 80 };
   preferences.popupColors = {
     background: '#FFFFFF',
