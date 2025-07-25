@@ -89,6 +89,7 @@ export default function ScreenBlinkHomepage() {
 	const [isEditingMessage, setIsEditingMessage] = useState(false);
 	const [tempMessage, setTempMessage] = useState("");
 	const [cameraError, setCameraError] = useState<string | null>(null);
+	const [showSensitivityInfo, setShowSensitivityInfo] = useState(false);
 
 	// Load preferences from main process
 	useEffect(() => {
@@ -538,7 +539,7 @@ export default function ScreenBlinkHomepage() {
 										<div className="flex items-center gap-2">
 											<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
 											<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-												Blink Detection Sensitivity
+												Blink Detection Threshold
 											</span>
 										</div>
 									</div>
@@ -573,11 +574,30 @@ export default function ScreenBlinkHomepage() {
 											</div>
 										</div>
 										<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-											Set your eye size threshold for blink detection. Lower
-											values are less sensitive and need more pronounced blinks,
-											higher values are more sensitive. Recommended values are
-											between 0.20 and 0.25.
+											<strong>Your eye size</strong> is measured continuously.<br />
+											When your eye size drops below the <strong>threshold</strong> above, a blink is detected.<br /><br />
+											<span className="font-semibold">How to find the right setting:</span>
+											<ul className="list-disc list-inside mt-1 mb-1">
+												<li>Start reminders.</li>
+												<li>Press <strong>Show Camera</strong>.</li>
+												<li>Your <strong>eye size</strong> will appear in the top right corner.</li>
+												<li>Set the threshold a few notches below your average eye size, making sure blinks are being accurately detected.</li>
+											</ul>
 										</p>
+										<button
+											onClick={() => setShowSensitivityInfo((prev) => !prev)}
+											className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mt-1"
+										>
+											{showSensitivityInfo ? "Hide Info" : "Learn More"}
+										</button>
+										{showSensitivityInfo && (
+											<div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+												<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+													<strong>Lower values</strong> = less sensitive (only strong, full blinks are detected)<br />
+													<strong>Higher values</strong> = more sensitive (even small or quick blinks are detected)
+												</p>
+											</div>
+										)}
 									</div>
 
 									{/* MGD Toggle */}

@@ -12,8 +12,16 @@
             console.log('Sound player received path:', soundPath);
             const audio = document.getElementById('audio');
             audio.src = soundPath;
+            
+            // Listen for when audio finishes playing
+            audio.addEventListener('ended', () => {
+                ipcRenderer.send('audio-finished');
+            });
+            
             audio.play().catch(error => {
                 console.error('Error playing sound:', error);
+                // If there's an error, still notify that we're done
+                ipcRenderer.send('audio-finished');
             });
         });
     </script>

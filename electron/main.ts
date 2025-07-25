@@ -2133,11 +2133,20 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 			soundWindow.webContents.send('play-sound', soundPath);
 		});
 		
-		// Close the window after playing
+		// Listen for the audio finished event and close the window
+		soundWindow.webContents.on('ipc-message', (event, channel) => {
+			if (channel === 'audio-finished') {
+				if (!soundWindow.isDestroyed()) {
+					soundWindow.close();
+				}
+			}
+		});
+		
+		// Fallback: close window after 3 seconds if audio doesn't finish
 		setTimeout(() => {
 			if (!soundWindow.isDestroyed()) {
 				soundWindow.close();
 			}
-		}, 1000);
+		}, 3000);
 	}
 }
