@@ -532,24 +532,11 @@ export default function ScreenBlinkHomepage() {
 
 							{/* Blink Detection Sensitivity - Only shown when camera is enabled */}
 							{preferences.cameraEnabled && (
-								<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-									<div className="flex items-center justify-between mb-3">
-										<div className="flex items-center gap-2">
-											<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-												Advanced Blink Detection
-											</span>
-										</div>
-									</div>
-									<div className="space-y-4">
-										<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-											<strong>Advanced blink detection</strong> is now active with dynamic baseline.<br />
-											The system learns your natural eye size and detects blinks using statistical analysis.
-										</p>
-									</div>
+								<div className="space-y-4">
 
-									{/* MGD Toggle */}
-									<div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+
+									{/* MGD Toggle Box */}
+									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
 										<div className="flex items-center justify-between mb-3">
 											<div className="flex items-center gap-2">
 												<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -626,24 +613,6 @@ export default function ScreenBlinkHomepage() {
 											</div>
 										)}
 									</div>
-								</div>
-							)}
-
-							{/* Camera Description */}
-							{preferences.cameraEnabled && (
-								<div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-200">
-									<p className="mb-2">Advanced camera eye tracking is enabled.</p>
-									<ul className="list-disc list-inside space-y-1">
-										<li>
-											The system uses dynamic baseline detection to learn your natural eye characteristics
-										</li>
-										<li>
-											Blinks are detected using statistical analysis of eye aspect ratio changes
-										</li>
-										<li>
-											Reminders will only show if you haven't blinked within your set interval (Unless MGD mode is enabled)
-										</li>
-									</ul>
 								</div>
 							)}
 						</div>
