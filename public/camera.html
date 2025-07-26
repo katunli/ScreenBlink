@@ -118,14 +118,16 @@
       const thresholdText = currentThreshold.toFixed(3);
       
       info.innerHTML = `
-        When your eye size goes below your set threshold a blink is detected
+        Advanced blink detection with dynamic baseline is active
       `;
       info.style.background = isBlinking ? 'rgba(0, 255, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)';
 
       currentValues.innerHTML = `
         <strong>Current:</strong> Eye size: ${eyeSizeText}
         <br>
-        <strong>Threshold:</strong> ${thresholdText}
+        <strong>Baseline:</strong> ${lastFaceData && lastFaceData.baseline ? lastFaceData.baseline.toFixed(3) : 'Building...'}
+        <br>
+        <strong>Status:</strong> ${lastFaceData && lastFaceData.blink_phase ? lastFaceData.blink_phase : 'monitoring'}
       `;
       currentValues.style.background = isBlinking ? 'rgba(0, 255, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)';
     }

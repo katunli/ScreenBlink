@@ -92,9 +92,7 @@ let exerciseIntervalId: NodeJS.Timeout | null = null;
 let exerciseSnoozeTimeout: NodeJS.Timeout | null = null;
 let currentExercisePopup: BrowserWindow | null = null;
 let isExerciseShowing = false;
-let earThresholdUpdateTimeout: NodeJS.Timeout | null = null;
 let cameraThresholdUpdateTimeout: NodeJS.Timeout | null = null;
-const FRAME_SKIP = 3; 
 let mgdReminderLoopActive = false;
 let cameraWindow: BrowserWindow | null = null;
 
@@ -138,7 +136,6 @@ const preferences = {
 	popupMessage: store.get('popupMessage', 'Blink!') as string,
 	isTracking: false,
 	keyboardShortcut: store.get('keyboardShortcut', 'Ctrl+I') as string,
-	blinkSensitivity: store.get('blinkSensitivity', 0.20) as number,
 	mgdMode: store.get('mgdMode', false) as boolean,
 	soundEnabled: store.get('soundEnabled', false) as boolean
 };
@@ -473,10 +470,6 @@ async function gracefulShutdown(): Promise<void> {
 		if (exerciseSnoozeTimeout) {
 			clearTimeout(exerciseSnoozeTimeout);
 			exerciseSnoozeTimeout = null;
-		}
-		if (earThresholdUpdateTimeout) {
-			clearTimeout(earThresholdUpdateTimeout);
-			earThresholdUpdateTimeout = null;
 		}
 		if (cameraThresholdUpdateTimeout) {
 			clearTimeout(cameraThresholdUpdateTimeout);
@@ -1094,11 +1087,6 @@ function showCameraWindow() {
 	cameraWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'camera.html'));
 	
 	cameraWindow.webContents.on('did-finish-load', () => {
-		// Send current threshold to camera window
-		if (cameraWindow && !cameraWindow.isDestroyed()) {
-			cameraWindow.webContents.send('threshold-updated', preferences.blinkSensitivity);
-		}
-		
 		// Request video stream from blink detector process
 		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
 			blinkDetectorProcess.stdin.write(JSON.stringify({ 
@@ -1259,11 +1247,9 @@ function startBlinkDetector() {
 					}
 				} else if (parsed.status) {
 					console.log('Blink detector status:', parsed.status);
-					// If the process is ready, send the initial sensitivity value
+					// If the process is ready, send initial configuration
 					if (parsed.status === "Models loaded successfully, ready for camera activation" && blinkDetectorProcess.stdin) {
 						const config = {
-							ear_threshold: preferences.blinkSensitivity,
-							frame_skip: FRAME_SKIP,
 							target_fps: 10, 
 							processing_resolution: [320, 240] 
 						};
@@ -1570,37 +1556,6 @@ ipcMain.on("stop-camera-tracking", () => {
 	
 	preferences.cameraEnabled = false;
 	store.set('cameraEnabled', false);
-});
-
-ipcMain.on("update-blink-sensitivity", (_event, sensitivity: number) => {
-	preferences.blinkSensitivity = sensitivity;
-	store.set('blinkSensitivity', sensitivity);
-	
-	// Clear any existing camera window update timeout
-	if (cameraThresholdUpdateTimeout) {
-		clearTimeout(cameraThresholdUpdateTimeout);
-	}
-	
-	// Set a new timeout to update the camera window after 300ms of no changes
-	cameraThresholdUpdateTimeout = setTimeout(() => {
-		// Send threshold update to camera window if it's open
-		if (cameraWindow && !cameraWindow.isDestroyed()) {
-			cameraWindow.webContents.send('threshold-updated', sensitivity);
-		}
-	}, 300);
-	
-	// Clear any existing Python process update timeout
-	if (earThresholdUpdateTimeout) {
-		clearTimeout(earThresholdUpdateTimeout);
-	}
-	
-	// Set a new timeout to update the Python process after 500ms of no changes
-	earThresholdUpdateTimeout = setTimeout(() => {
-		// Send the new threshold to the Python process if it's running
-		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
-			blinkDetectorProcess.stdin.write(JSON.stringify({ ear_threshold: sensitivity }) + '\n');
-		}
-	}, 500);
 });
 
 function showExercisePopup() {
@@ -2083,7 +2038,6 @@ ipcMain.on('reset-preferences', () => {
   preferences.popupMessage = 'Blink!';
   preferences.isTracking = false;
   preferences.keyboardShortcut = 'Ctrl+I';
-  preferences.blinkSensitivity = 0.20;
   preferences.mgdMode = false;
   preferences.soundEnabled = false;
   

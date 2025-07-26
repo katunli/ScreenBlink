@@ -33,7 +33,6 @@ interface UserPreferences {
 	popupMessage: string;
 	isTracking: boolean;
 	keyboardShortcut: string;
-	blinkSensitivity: number;
 	mgdMode: boolean;
 	showMgdInfo: boolean;
 	showPopupColors: boolean;
@@ -56,7 +55,6 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 	popupMessage: "Blink!",
 	isTracking: false,
 	keyboardShortcut: "Ctrl+I",
-	blinkSensitivity: 0.2,
 	mgdMode: false,
 	showMgdInfo: false,
 	showPopupColors: false,
@@ -89,7 +87,6 @@ export default function ScreenBlinkHomepage() {
 	const [isEditingMessage, setIsEditingMessage] = useState(false);
 	const [tempMessage, setTempMessage] = useState("");
 	const [cameraError, setCameraError] = useState<string | null>(null);
-	const [showSensitivityInfo, setShowSensitivityInfo] = useState(false);
 
 	// Load preferences from main process
 	useEffect(() => {
@@ -540,65 +537,15 @@ export default function ScreenBlinkHomepage() {
 										<div className="flex items-center gap-2">
 											<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
 											<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-												Blink Detection Threshold
+												Advanced Blink Detection
 											</span>
 										</div>
 									</div>
 									<div className="space-y-4">
-										<div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-											<input
-												type="range"
-												min="0.1"
-												max="0.3"
-												step="0.01"
-												value={preferences.blinkSensitivity}
-												onChange={(e) => {
-													const newSensitivity = Number.parseFloat(
-														e.target.value,
-													);
-													setPreferences((prev) => ({
-														...prev,
-														blinkSensitivity: newSensitivity,
-													}));
-													window.ipcRenderer?.send(
-														"update-blink-sensitivity",
-														newSensitivity,
-													);
-												}}
-												className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
-												style={{
-													background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${((preferences.blinkSensitivity - 0.1) / 0.2) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} ${((preferences.blinkSensitivity - 0.1) / 0.2) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} 100%)`,
-												}}
-											/>
-											<div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full font-semibold min-w-[80px] text-center">
-												{preferences.blinkSensitivity.toFixed(2)}
-											</div>
-										</div>
 										<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-											<strong>Your eye size</strong> is measured continuously.<br />
-											When your eye size drops below the <strong>threshold</strong> above, a blink is detected.<br /><br />
-											<span className="font-semibold">How to find the right setting:</span>
-											<ul className="list-disc list-inside mt-1 mb-1">
-												<li>Start reminders.</li>
-												<li>Press <strong>Show Camera</strong>.</li>
-												<li>Your <strong>eye size</strong> will appear in the top right corner.</li>
-												<li>Set the threshold a few notches below your average eye size, making sure blinks are being accurately detected.</li>
-											</ul>
+											<strong>Advanced blink detection</strong> is now active with dynamic baseline.<br />
+											The system learns your natural eye size and detects blinks using statistical analysis.
 										</p>
-										<button
-											onClick={() => setShowSensitivityInfo((prev) => !prev)}
-											className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mt-1"
-										>
-											{showSensitivityInfo ? "Hide Info" : "Learn More"}
-										</button>
-										{showSensitivityInfo && (
-											<div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-												<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-													<strong>Lower values</strong> = less sensitive (only strong, full blinks are detected)<br />
-													<strong>Higher values</strong> = more sensitive (even small or quick blinks are detected)
-												</p>
-											</div>
-										)}
 									</div>
 
 									{/* MGD Toggle */}
@@ -685,15 +632,16 @@ export default function ScreenBlinkHomepage() {
 							{/* Camera Description */}
 							{preferences.cameraEnabled && (
 								<div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-200">
-									<p className="mb-2">Camera eye tracking is enabled.</p>
+									<p className="mb-2">Advanced camera eye tracking is enabled.</p>
 									<ul className="list-disc list-inside space-y-1">
 										<li>
-											The camera will detect when you blink and then close
-											reminder popups
+											The system uses dynamic baseline detection to learn your natural eye characteristics
 										</li>
 										<li>
-											Reminders will only show if you haven't blinked within
-											your set interval (Unless MGD mode is enabled)
+											Blinks are detected using statistical analysis of eye aspect ratio changes
+										</li>
+										<li>
+											Reminders will only show if you haven't blinked within your set interval (Unless MGD mode is enabled)
 										</li>
 									</ul>
 								</div>

@@ -9,25 +9,39 @@ from pathlib import Path
 import threading
 import queue
 import base64
+from collections import deque
+import statistics
 
-# Constants
-EAR_THRESHOLD = 0.20  # Default value
-BLINK_COOLDOWN = 0.3  # seconds
+# Core detection parameters
+BLINK_COOLDOWN = 0.3
 TARGET_FPS = 10
-FACE_DETECTION_SKIP = 1 
 PROCESSING_RESOLUTION = (320, 240) 
-BLINK_DISPLAY_DURATION = 0.35  # seconds
+BLINK_DISPLAY_DURATION = 0.3
 
-# Global variables
+# Detection thresholds - balanced for accuracy vs sensitivity
+BLINK_MIN_EAR_DROP = 0.18
+BLINK_DURATION_MIN = 0.05
+BLINK_DURATION_MAX = 0.6
+BLINK_RECOVERY_THRESHOLD = 0.7
+BASELINE_WINDOW_SIZE = 15
+
+# System state
 SEND_VIDEO = False
 CAMERA_ACTIVE = False
 cap = None
 command_queue = queue.Queue()
-current_face_detection_skip = FACE_DETECTION_SKIP
 target_fps = TARGET_FPS
 processing_resolution = PROCESSING_RESOLUTION
-current_ear_threshold = EAR_THRESHOLD 
-last_blink_display_time = 0.0  # Track when blink was last detected for UI display
+last_blink_display_time = 0.0
+
+# Detection state - tracks blink progress and baseline
+baseline_ear_values = deque(maxlen=BASELINE_WINDOW_SIZE)
+current_baseline_ear = 0.0
+blink_in_progress = False
+blink_start_time = 0.0
+last_blink_time = 0.0
+baseline_smoothing_factor = 0.3
+max_drop_percentage = 0.0
 
 _cached_json_strings = {
     "no_face_data": json.dumps({"faceData": {
@@ -39,7 +53,7 @@ _cached_json_strings = {
     }})
 }
 
-# Performance optimization: Pre-allocated buffers
+# Pre-allocated buffers for performance
 class PreallocatedBuffers:
     def __init__(self, max_points=68):
         self.landmarks_array = np.zeros((max_points, 2), dtype=np.int32)
@@ -79,12 +93,89 @@ def encode_frame(frame):
     _, buffer = cv2.imencode('.jpg', frame, _encode_params)
     return base64.b64encode(buffer).decode('utf-8')
 
+def calculate_baseline_ear(ear_values):
+    # Weighted average gives recent values more influence for faster adaptation
+    if len(ear_values) < 5:
+        return None
+    
+    weights = np.linspace(0.5, 1.0, len(ear_values))
+    weighted_sum = np.sum(np.array(ear_values) * weights)
+    total_weight = np.sum(weights)
+    
+    return weighted_sum / total_weight
+
+def detect_blink_advanced(current_ear, current_time):
+    global baseline_ear_values, current_baseline_ear, blink_in_progress, blink_start_time, last_blink_time, max_drop_percentage
+    
+    baseline_ear_values.append(current_ear)
+    
+    # Update baseline with exponential smoothing for responsive adaptation
+    if len(baseline_ear_values) >= 5:
+        new_baseline = calculate_baseline_ear(baseline_ear_values)
+        if new_baseline:
+            if current_baseline_ear > 0:
+                current_baseline_ear = (baseline_smoothing_factor * new_baseline + 
+                                      (1 - baseline_smoothing_factor) * current_baseline_ear)
+            else:
+                current_baseline_ear = new_baseline
+    else:
+        return False, None
+    
+    if current_baseline_ear <= 0:
+        return False, None
+        
+    ear_drop_percentage = (current_baseline_ear - current_ear) / current_baseline_ear
+    
+    # Start blink detection when significant drop occurs
+    if not blink_in_progress and ear_drop_percentage > BLINK_MIN_EAR_DROP and ear_drop_percentage > 0:
+        blink_in_progress = True
+        blink_start_time = current_time
+        max_drop_percentage = ear_drop_percentage
+        return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "start"}
+    
+    # Track maximum drop and validate blink completion
+    elif blink_in_progress:
+        if ear_drop_percentage > max_drop_percentage:
+            max_drop_percentage = ear_drop_percentage
+        
+        blink_duration = current_time - blink_start_time
+        
+        # End blink when eye recovers or duration exceeds limit
+        if current_ear > current_baseline_ear * BLINK_RECOVERY_THRESHOLD or blink_duration > BLINK_DURATION_MAX:
+            # Only register as valid blink if significant drop occurred
+            if (BLINK_DURATION_MIN <= blink_duration <= BLINK_DURATION_MAX and 
+                max_drop_percentage > BLINK_MIN_EAR_DROP):
+                if (current_time - last_blink_time) > BLINK_COOLDOWN:
+                    last_blink_time = current_time
+                    blink_in_progress = False
+                    
+                    return True, {
+                        "baseline": current_baseline_ear,
+                        "drop": max_drop_percentage,
+                        "duration": blink_duration,
+                        "phase": "complete"
+                    }
+            
+            blink_in_progress = False
+            max_drop_percentage = 0.0
+    
+    return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "monitoring"}
+
+def reset_blink_detection():
+    global baseline_ear_values, current_baseline_ear, blink_in_progress, blink_start_time, last_blink_time, baseline_smoothing_factor, max_drop_percentage
+    baseline_ear_values.clear()
+    current_baseline_ear = 0.0
+    blink_in_progress = False
+    blink_start_time = 0.0
+    last_blink_time = 0.0
+    baseline_smoothing_factor = 0.3
+    max_drop_percentage = 0.0
+
 def find_available_camera():
-    """Find the first available camera with detailed debugging"""
     print(json.dumps({"debug": "Starting camera detection..."}))
     sys.stdout.flush()
     
-    # Platform-specific backends
+    # Platform-specific backends for maximum compatibility
     if sys.platform == "win32":
         backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
     elif sys.platform == "darwin":
@@ -96,7 +187,7 @@ def find_available_camera():
         print(json.dumps({"debug": f"Testing backend: {backend}"}))
         sys.stdout.flush()
         
-        for i in range(5):  # Check cameras 0-4
+        for i in range(5):
             print(json.dumps({"debug": f"Trying camera index {i} with backend {backend}"}))
             sys.stdout.flush()
             
@@ -126,7 +217,6 @@ def find_available_camera():
     return None, None
 
 def start_camera():
-    """Start the camera and return success status"""
     global cap, CAMERA_ACTIVE
     
     print(json.dumps({"debug": "start_camera() called"}))
@@ -137,14 +227,13 @@ def start_camera():
         sys.stdout.flush()
         return True
     
-    # Try to start camera with retry logic
+    # Retry logic for robust camera initialization
     max_retries = 10  
     retry_delay = 2   
     for attempt in range(max_retries):
         print(json.dumps({"debug": f"Camera start attempt {attempt + 1}/{max_retries}"}))
         sys.stdout.flush()
         
-        # Find available camera
         camera_index, backend = find_available_camera()
         if camera_index is None:
             print(json.dumps({"debug": f"No working camera found on attempt {attempt + 1}"}))
@@ -157,11 +246,9 @@ def start_camera():
                 sys.stdout.flush()
                 return False
         
-        # Initialize video capture with the working camera
         try:
             cap = cv2.VideoCapture(camera_index, backend)
             
-            # Test if we can actually read frames
             ret, test_frame = cap.read()
             if not ret or test_frame is None:
                 print(json.dumps({"debug": f"Camera opened but cannot read frames on attempt {attempt + 1}"}))
@@ -178,7 +265,6 @@ def start_camera():
             
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, processing_resolution[0])
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, processing_resolution[1])
-            
             cap.set(cv2.CAP_PROP_FPS, target_fps)
             
             actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -190,6 +276,9 @@ def start_camera():
             CAMERA_ACTIVE = True
             print(json.dumps({"status": "Camera opened successfully"}))
             sys.stdout.flush()
+            
+            reset_blink_detection()
+            
             return True
             
         except Exception as e:
@@ -210,7 +299,6 @@ def start_camera():
     return False
 
 def stop_camera():
-    """Stop the camera"""
     global cap, CAMERA_ACTIVE
     
     print(json.dumps({"debug": "stop_camera() called"}))
@@ -225,7 +313,6 @@ def stop_camera():
     sys.stdout.flush()
 
 def input_thread():
-    """Thread to handle stdin input"""
     print(json.dumps({"debug": "Input thread started"}))
     sys.stdout.flush()
     
@@ -242,8 +329,7 @@ def input_thread():
             break
 
 def process_commands():
-    """Process commands from the queue"""
-    global SEND_VIDEO, current_ear_threshold, current_face_detection_skip, target_fps, processing_resolution
+    global SEND_VIDEO, target_fps, processing_resolution
     
     while not command_queue.empty():
         try:
@@ -253,16 +339,7 @@ def process_commands():
             print(json.dumps({"debug": f"Processing command: {data}"}))
             sys.stdout.flush()
             
-            if 'ear_threshold' in data:
-                current_ear_threshold = float(data['ear_threshold'])
-                print(json.dumps({"status": f"Updated EAR threshold to {current_ear_threshold}"}))
-                print(json.dumps({"debug": f"Current EAR threshold being used: {current_ear_threshold}"}))
-                sys.stdout.flush()
-            elif 'frame_skip' in data:
-                current_face_detection_skip = int(data['frame_skip'])
-                print(json.dumps({"status": f"Updated face detection skip to {current_face_detection_skip}"}))
-                sys.stdout.flush()
-            elif 'target_fps' in data:
+            if 'target_fps' in data:
                 target_fps = int(data['target_fps'])
                 if CAMERA_ACTIVE and cap is not None:
                     cap.set(cv2.CAP_PROP_FPS, target_fps)
@@ -295,36 +372,30 @@ def process_commands():
             sys.stdout.flush()
 
 def main():
-    global SEND_VIDEO, CAMERA_ACTIVE, cap, current_ear_threshold, last_blink_display_time  # Add current_ear_threshold to global declaration
+    global SEND_VIDEO, CAMERA_ACTIVE, cap, last_blink_display_time
     
     print(json.dumps({"status": "Starting blink detector in standby mode..."}))
     sys.stdout.flush()
     
-    # Initialize dlib's face detector and facial landmark predictor
     detector = dlib.get_frontal_face_detector()
     
-    # Get the model path - handle both development and bundled scenarios
+    # Model path handling for both development and bundled scenarios
     if getattr(sys, 'frozen', False):
-        # Running as bundled binary
         base_path = sys._MEIPASS
         predictor_path = os.path.join(base_path, 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
     else:
-        # Running as script in development
         app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         predictor_path = os.path.join(app_root, 'electron', 'assets', 'models', 'shape_predictor_68_face_landmarks.dat')
     
-    # Check if model exists
     if not os.path.exists(predictor_path):
         print(json.dumps({"error": f"Facial landmark model not found at: {predictor_path}"}))
         sys.exit(1)
     
     predictor = dlib.shape_predictor(predictor_path)
-    
-    # Performance optimization: Pre-allocate buffers
     buffers = PreallocatedBuffers()
     
     print(json.dumps({"status": "Models loaded successfully, ready for camera activation"}))
-    print(json.dumps({"debug": f"Initial EAR threshold set to: {current_ear_threshold}"}))
+    print(json.dumps({"debug": "Advanced blink detection with dynamic baseline is active"}))
     sys.stdout.flush()
     
     last_blink_time = time.time()
@@ -343,24 +414,21 @@ def main():
         "eyeLandmarks": []
     }
     
-    # Start input thread
     input_handler = threading.Thread(target=input_thread, daemon=True)
     input_handler.start()
     
     try:
         while True:
-            # Process any pending commands
             process_commands()
             
-            # Only process frames if camera is active
             if not CAMERA_ACTIVE or cap is None:
-                time.sleep(0.1)  # Sleep longer when camera is not active
+                time.sleep(0.1)
                 continue
             
-            # Frame rate limiting
+            # Frame rate limiting for consistent processing
             current_time = time.time()
             if current_time - last_frame_time < frame_interval:
-                time.sleep(0.001)  # Small sleep to prevent busy waiting
+                time.sleep(0.001)
                 continue
             
             last_frame_time = current_time
@@ -378,70 +446,66 @@ def main():
             
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
-            should_detect_face = (frame_count % current_face_detection_skip == 0)
+            faces = detector(gray, 0)
+            last_face_detection_time = current_time
             
-            if should_detect_face:
-                faces = detector(gray, 0)
-                last_face_detection_time = current_time
+            face_data = default_face_data.copy()
+            
+            for face in faces:
+                left_eye, right_eye = get_eye_landmarks_only(predictor, gray, face, buffers)
                 
-                face_data = default_face_data.copy()
+                left_ear = calculate_ear_fast(left_eye, buffers)
+                right_ear = calculate_ear_fast(right_eye, buffers)
+                avg_ear = (left_ear + right_ear) * 0.5
                 
-                for face in faces:
-                    left_eye, right_eye = get_eye_landmarks_only(predictor, gray, face, buffers)
-                    
-                    left_ear = calculate_ear_fast(left_eye, buffers)
-                    right_ear = calculate_ear_fast(right_eye, buffers)
-                    avg_ear = (left_ear + right_ear) * 0.5
-                    
-                    frame_width = frame.shape[1]
-                    frame_height = frame.shape[0]
-                    
-                    face_data["faceDetected"] = True
-                    face_data["ear"] = float(avg_ear)
-                    face_data["faceRect"] = {
-                        "x": float(face.left() / frame_width),
-                        "y": float(face.top() / frame_height),
-                        "width": float(face.width() / frame_width),
-                        "height": float(face.height() / frame_height)
-                    }
-                    
-                    buffers.concatenated_eyes[:6] = left_eye
-                    buffers.concatenated_eyes[6:] = right_eye
-                    
-                    for i in range(12):
-                        buffers.normalized_landmarks[i]["x"] = float(buffers.concatenated_eyes[i, 0] / frame_width)
-                        buffers.normalized_landmarks[i]["y"] = float(buffers.concatenated_eyes[i, 1] / frame_height)
-                    
-                    face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
-                    
-                    # Check if we should show blink detection in UI
-                    should_show_blink = (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION
-                    
-                    if avg_ear < current_ear_threshold and (current_time - last_blink_time) > BLINK_COOLDOWN:
-                        last_blink_time = current_time
-                        last_blink_display_time = current_time
-                        face_data["blink"] = True
-                        print(json.dumps({
-                            "blink": True,
-                            "ear": float(avg_ear),
-                            "time": float(current_time)
-                        }))
-                        print(json.dumps({"debug": f"Blink detected! EAR: {avg_ear:.3f}, Threshold: {current_ear_threshold:.3f}"}))
-                        sys.stdout.flush()
-                    elif should_show_blink:
-                        # Keep showing blink detection for the display duration
-                        face_data["blink"] = True
+                frame_width = frame.shape[1]
+                frame_height = frame.shape[0]
                 
-                cached_face_data = face_data
-            else:
-                # Use cached face data but check if we should still show blink detection
-                face_data = cached_face_data if cached_face_data else default_face_data
+                face_data["faceDetected"] = True
+                face_data["ear"] = float(avg_ear)
+                face_data["faceRect"] = {
+                    "x": float(face.left() / frame_width),
+                    "y": float(face.top() / frame_height),
+                    "width": float(face.width() / frame_width),
+                    "height": float(face.height() / frame_height)
+                }
                 
-                # Check if we should still show blink detection from previous detection
-                if face_data.get("faceDetected", False):
-                    should_show_blink = (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION
-                    if should_show_blink:
-                        face_data["blink"] = True
+                buffers.concatenated_eyes[:6] = left_eye
+                buffers.concatenated_eyes[6:] = right_eye
+                
+                for i in range(12):
+                    buffers.normalized_landmarks[i]["x"] = float(buffers.concatenated_eyes[i, 0] / frame_width)
+                    buffers.normalized_landmarks[i]["y"] = float(buffers.concatenated_eyes[i, 1] / frame_height)
+                
+                face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
+                
+                blink_detected, blink_info = detect_blink_advanced(avg_ear, current_time)
+                
+                # Simplified blink state management to prevent visual flicker
+                if blink_detected and blink_info:
+                    last_blink_display_time = current_time
+                    face_data["blink"] = True
+                    print(json.dumps({
+                        "blink": True,
+                        "ear": float(avg_ear),
+                        "baseline": float(blink_info["baseline"]),
+                        "drop_percentage": float(blink_info["drop"]),
+                        "duration": float(blink_info["duration"]),
+                        "time": float(current_time)
+                    }))
+                    print(json.dumps({
+                        "debug": f"Advanced blink detected! EAR: {avg_ear:.3f}, Baseline: {blink_info['baseline']:.3f}, Drop: {blink_info['drop']:.1%}, Duration: {blink_info['duration']:.3f}s"
+                    }))
+                    sys.stdout.flush()
+                elif (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION:
+                    face_data["blink"] = True
+                
+                # Provide real-time feedback on detection status
+                if blink_info and current_baseline_ear > 0:
+                    face_data["baseline"] = float(current_baseline_ear)
+                    face_data["blink_phase"] = blink_info.get("phase", "monitoring")
+                elif current_baseline_ear == 0:
+                    face_data["blink_phase"] = "initializing"
             
             if face_data.get("faceDetected", False):
                 print(json.dumps({"faceData": face_data}))
@@ -449,7 +513,8 @@ def main():
                 print(_cached_json_strings["no_face_data"])
             sys.stdout.flush()
             
-            if SEND_VIDEO and frame_count % 3 == 0 and face_data.get("faceDetected", False):
+            # Stream video for visualization when requested
+            if SEND_VIDEO and face_data.get("faceDetected", False):
                 if processing_resolution == (640, 480):
                     frame_base64 = encode_frame(frame)
                 else:

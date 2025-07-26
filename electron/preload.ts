@@ -39,7 +39,6 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
       'blink-detected',
       'start-camera-tracking',
       'stop-camera-tracking',
-      'update-blink-sensitivity',
       'skip-exercise',
       'snooze-exercise',
       'update-mgd-mode',
