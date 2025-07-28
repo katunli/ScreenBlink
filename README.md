@@ -36,7 +36,7 @@ A desktop application to help prevent dry eyes and eye strain by reminding users
 
 ## Installation
 
-Download the latest release from the [Website](https://screenblink.vercel.app/)
+Download the latest release from the [Website](https://www.screenblink.org/)
 
 ---
 
