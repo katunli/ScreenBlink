@@ -56,12 +56,56 @@ jobs:
           CURR_TOTAL=${{ env.CURR_TOTAL }}
           YESTERDAY_TOTAL=$((YESTERDAY_DMG + YESTERDAY_EXE))
           MONDAY_TOTAL=$((MONDAY_DMG + MONDAY_EXE))
-          DIFF_DMG=$((CURR_DMG - YESTERDAY_DMG))
-          DIFF_EXE=$((CURR_EXE - YESTERDAY_EXE))
-          DIFF_TOTAL=$((CURR_TOTAL - YESTERDAY_TOTAL))
-          DIFF_DMG_MONDAY=$((CURR_DMG - MONDAY_DMG))
-          DIFF_EXE_MONDAY=$((CURR_EXE - MONDAY_EXE))
-          DIFF_TOTAL_MONDAY=$((CURR_TOTAL - MONDAY_TOTAL))
+          
+          # Check if assets were replaced (download count dropped significantly)
+          # If current count is less than 10% of previous count, treat as replacement
+          if [ "$YESTERDAY_DMG" -gt 0 ] && [ "$CURR_DMG" -lt $((YESTERDAY_DMG / 10)) ]; then
+            echo "Asset replacement detected for DMG - treating as fresh start"
+            DIFF_DMG=$CURR_DMG
+          else
+            DIFF_DMG=$((CURR_DMG - YESTERDAY_DMG))
+          fi
+          
+          if [ "$YESTERDAY_EXE" -gt 0 ] && [ "$CURR_EXE" -lt $((YESTERDAY_EXE / 10)) ]; then
+            echo "Asset replacement detected for EXE - treating as fresh start"
+            DIFF_EXE=$CURR_EXE
+          else
+            DIFF_EXE=$((CURR_EXE - YESTERDAY_EXE))
+          fi
+          
+          # Ensure we don't show negative numbers
+          if [ "$DIFF_DMG" -lt 0 ]; then
+            DIFF_DMG=0
+          fi
+          if [ "$DIFF_EXE" -lt 0 ]; then
+            DIFF_EXE=0
+          fi
+          
+          DIFF_TOTAL=$((DIFF_DMG + DIFF_EXE))
+          
+          # Handle Monday comparisons similarly
+          if [ "$MONDAY_DMG" -gt 0 ] && [ "$CURR_DMG" -lt $((MONDAY_DMG / 10)) ]; then
+            DIFF_DMG_MONDAY=$CURR_DMG
+          else
+            DIFF_DMG_MONDAY=$((CURR_DMG - MONDAY_DMG))
+          fi
+          
+          if [ "$MONDAY_EXE" -gt 0 ] && [ "$CURR_EXE" -lt $((MONDAY_EXE / 10)) ]; then
+            DIFF_EXE_MONDAY=$CURR_EXE
+          else
+            DIFF_EXE_MONDAY=$((CURR_EXE - MONDAY_EXE))
+          fi
+          
+          # Ensure we don't show negative numbers for Monday comparisons
+          if [ "$DIFF_DMG_MONDAY" -lt 0 ]; then
+            DIFF_DMG_MONDAY=0
+          fi
+          if [ "$DIFF_EXE_MONDAY" -lt 0 ]; then
+            DIFF_EXE_MONDAY=0
+          fi
+          
+          DIFF_TOTAL_MONDAY=$((DIFF_DMG_MONDAY + DIFF_EXE_MONDAY))
+          
           echo "DIFF_DMG=$DIFF_DMG" >> $GITHUB_ENV
           echo "DIFF_EXE=$DIFF_EXE" >> $GITHUB_ENV
           echo "DIFF_TOTAL=$DIFF_TOTAL" >> $GITHUB_ENV
