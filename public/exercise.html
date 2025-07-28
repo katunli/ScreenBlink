@@ -95,14 +95,11 @@
             "Take a break and look at something 20 feet away for 20 seconds."
         ];
 
-        // Get the current exercise index from localStorage or start at 0
         let currentExerciseIndex = parseInt(localStorage.getItem('currentExerciseIndex') || '0');
         
-        // Get the current exercise and display it
         let currentExercise = exercises[currentExerciseIndex];
         document.getElementById('exercise').textContent = currentExercise;
         
-        // Increment the index for next time (loop back to 0 when reaching the end)
         currentExerciseIndex = (currentExerciseIndex + 1) % exercises.length;
         localStorage.setItem('currentExerciseIndex', currentExerciseIndex.toString());
 
