@@ -494,7 +494,7 @@ def main():
                         "time": float(current_time)
                     }))
                     print(json.dumps({
-                        "debug": f"Advanced blink detected! EAR: {avg_ear:.3f}, Baseline: {blink_info['baseline']:.3f}, Drop: {blink_info['drop']:.1%}, Duration: {blink_info['duration']:.3f}s"
+                        "debug": f"Blink detected! EAR: {avg_ear:.3f}, Baseline: {blink_info['baseline']:.3f}, Drop: {blink_info['drop']:.1%}, Duration: {blink_info['duration']:.3f}s"
                     }))
                     sys.stdout.flush()
                 elif (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION:
