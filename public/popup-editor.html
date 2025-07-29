@@ -15,7 +15,7 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.9);
       font-family: system-ui, -apple-system, sans-serif;
       -webkit-app-region: drag; /* Make the entire window draggable */
       position: relative;
@@ -39,15 +39,15 @@
       text-align: center;
       margin-bottom: 2px;
       -webkit-app-region: drag;
-      background: #000000;
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: #000000;
       padding: 2px 4px;
       border-radius: 3px;
       white-space: nowrap;
       cursor: pointer;
     }
     .title:hover {
-      background: #333333;
+      background: #F0F0F0;
     }
     .instructions {
       font-size: 0.65rem;
@@ -56,14 +56,14 @@
       -webkit-app-region: drag;
       line-height: 1.2;
       max-width: 95%;
-      background: #000000;
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: #000000;
       padding: 1px 3px;
       border-radius: 2px;
       cursor: pointer;
     }
     .instructions:hover {
-      background: #333333;
+      background: #F0F0F0;
     }
     .size-display {
       font-size: 0.7rem;
@@ -71,16 +71,15 @@
       text-align: center;
       margin-bottom: 4px;
       -webkit-app-region: drag;
-      background: #000000;
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: #000000;
       padding: 3px 6px;
       border-radius: 3px;
-      border: 1px solid rgba(255,255,255,0.3);
       white-space: nowrap;
       cursor: pointer;
     }
     .size-display:hover {
-      background: #333333;
+      background: #F0F0F0;
     }
     .buttons {
       display: flex;
@@ -96,7 +95,7 @@
       cursor: pointer;
       transition: all 0.2s;
       min-width: 50px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
       color: #FFFFFF;
     }
     button:hover {
@@ -255,8 +254,8 @@
       top: 6px;
       left: 50%;
       transform: translateX(-50%);
-      background: #000000;
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: #000000;
       padding: 3px 6px;
       border-radius: 3px;
       font-size: 0.6rem;
@@ -272,45 +271,14 @@
       opacity: 1;
     }
     
-    /* Corner indicators */
-    .corner-indicator {
-      position: absolute;
-      font-size: 0.8rem;
-      font-weight: 300;
-      z-index: 15;
-      -webkit-app-region: no-drag;
-      pointer-events: none;
-      text-shadow: 
-        -1px -1px 0 #000,
-        1px -1px 0 #000,
-        -1px 1px 0 #000,
-        1px 1px 0 #000,
-        0 0 2px rgba(0,0,0,0.8);
-    }
-    .corner-indicator.top-left {
-      top: 3px;
-      left: 3px;
-    }
-    .corner-indicator.top-right {
-      top: 3px;
-      right: 3px;
-    }
-    .corner-indicator.bottom-left {
-      bottom: 3px;
-      left: 3px;
-    }
-    .corner-indicator.bottom-right {
-      bottom: 3px;
-      right: 3px;
-    }
-    
     @media (prefers-color-scheme: dark) {
       html, body {
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(255, 255, 255, 0.9);
       }
       .size-display {
-        background: #000000;
-        border-color: rgba(255,255,255,0.4);
+        background: #FFFFFF;
+        border-color: #CCCCCC;
+        color: #000000;
       }
     }
   </style>
@@ -326,19 +294,13 @@
   <div class="resize-handle se"></div>
   <div class="resize-handle sw"></div>
   
-  <!-- Corner indicators -->
-  <div class="corner-indicator top-left">↖</div>
-  <div class="corner-indicator top-right">↗</div>
-  <div class="corner-indicator bottom-left">↙</div>
-  <div class="corner-indicator bottom-right">↘</div>
-  
   <!-- Drag indicator -->
   <div class="drag-indicator" id="dragIndicator">Click & Drag to Move</div>
   
   <div class="container">
     <div class="title">EDIT POPUP</div>
     <div class="instructions">
-      <strong>Click & drag</strong> to move • <strong>Drag edges</strong> to resize
+      Click & drag to move • Drag edges to resize
     </div>
     <div class="size-display" id="sizeDisplay">Width: 300px, Height: 120px</div>
     <div class="buttons">
@@ -362,9 +324,9 @@
 
     // Set initial colors
     updateColors({
-      background: '#1E1E1E',
-      text: '#FFFFFF',
-      transparency: 0.3
+      background: '#FFFFFF',
+      text: '#000000',
+      transparency: 0.9
     });
     
     // Listen for color updates
