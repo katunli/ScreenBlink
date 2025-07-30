@@ -761,7 +761,7 @@ export default function ScreenBlinkHomepage() {
 									)}
 									<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
 										Press the shortcut to start/stop reminders. Use at least one
-										modifier key (Ctrl, Shift, Alt) and one regular key.
+										modifier key (Ctrl, Shift, Alt, Cmd, Win) and one regular key.
 									</p>
 								</div>
 							</div>

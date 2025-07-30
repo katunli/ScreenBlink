@@ -18,8 +18,11 @@ TARGET_FPS = 10
 PROCESSING_RESOLUTION = (320, 240) 
 BLINK_DISPLAY_DURATION = 0.2
 
-# Detection thresholds - balanced for accuracy vs sensitivity
+# Adaptive approach: requires both percentage drop AND absolute EAR drop
+# This prevents false blinks when baseline EAR is very low (small fluctuations 
+# can cause high percentage drops but small absolute changes)
 BLINK_MIN_EAR_DROP = 0.17
+BLINK_MIN_ABSOLUTE_EAR_DROP = 0.03
 BLINK_DURATION_MIN = 0.05
 BLINK_DURATION_MAX = 0.6
 BLINK_RECOVERY_THRESHOLD = 0.7
@@ -125,9 +128,13 @@ def detect_blink_advanced(current_ear, current_time):
         return False, None
         
     ear_drop_percentage = (current_baseline_ear - current_ear) / current_baseline_ear
+    ear_drop_absolute = current_baseline_ear - current_ear
     
-    # Start blink detection when significant drop occurs
-    if not blink_in_progress and ear_drop_percentage > BLINK_MIN_EAR_DROP and ear_drop_percentage > 0:
+    # Start blink detection when both percentage and absolute drop thresholds are met
+    if (not blink_in_progress and 
+        ear_drop_percentage > BLINK_MIN_EAR_DROP and 
+        ear_drop_absolute > BLINK_MIN_ABSOLUTE_EAR_DROP and 
+        ear_drop_percentage > 0):
         blink_in_progress = True
         blink_start_time = current_time
         max_drop_percentage = ear_drop_percentage
@@ -142,16 +149,21 @@ def detect_blink_advanced(current_ear, current_time):
         
         # End blink when eye recovers or duration exceeds limit
         if current_ear > current_baseline_ear * BLINK_RECOVERY_THRESHOLD or blink_duration > BLINK_DURATION_MAX:
-            # Only register as valid blink if significant drop occurred
+            # Only register as valid blink if both percentage and absolute drop thresholds are met
             if (BLINK_DURATION_MIN <= blink_duration <= BLINK_DURATION_MAX and 
-                max_drop_percentage > BLINK_MIN_EAR_DROP):
+                max_drop_percentage > BLINK_MIN_EAR_DROP and
+                (current_baseline_ear * max_drop_percentage) > BLINK_MIN_ABSOLUTE_EAR_DROP):
                 if (current_time - last_blink_time) > BLINK_COOLDOWN:
                     last_blink_time = current_time
                     blink_in_progress = False
                     
+                    # Calculate the actual EAR value at maximum drop for accurate reporting
+                    max_drop_ear = current_baseline_ear * (1 - max_drop_percentage)
+                    
                     return True, {
                         "baseline": current_baseline_ear,
                         "drop": max_drop_percentage,
+                        "max_drop_ear": max_drop_ear,
                         "duration": blink_duration,
                         "phase": "complete"
                     }
@@ -485,16 +497,20 @@ def main():
                 if blink_detected and blink_info:
                     last_blink_display_time = current_time
                     face_data["blink"] = True
+                    
+                    # Use the EAR value at maximum drop for more accurate reporting
+                    max_drop_ear = blink_info.get("max_drop_ear", avg_ear)
+                    
                     print(json.dumps({
                         "blink": True,
-                        "ear": float(avg_ear),
+                        "ear": float(max_drop_ear), 
                         "baseline": float(blink_info["baseline"]),
                         "drop_percentage": float(blink_info["drop"]),
                         "duration": float(blink_info["duration"]),
                         "time": float(current_time)
                     }))
                     print(json.dumps({
-                        "debug": f"Blink detected! EAR: {avg_ear:.3f}, Baseline: {blink_info['baseline']:.3f}, Drop: {blink_info['drop']:.1%}, Duration: {blink_info['duration']:.3f}s"
+                        "debug": f"Blink detected! Max Drop EAR: {max_drop_ear:.3f}, Baseline: {blink_info['baseline']:.3f}, Drop: {blink_info['drop']:.1%}, Duration: {blink_info['duration']:.3f}s, Absolute Drop: {blink_info['baseline'] - max_drop_ear:.3f}"
                     }))
                     sys.stdout.flush()
                 elif (current_time - last_blink_display_time) < BLINK_DISPLAY_DURATION:
@@ -504,6 +520,13 @@ def main():
                 if blink_info and current_baseline_ear > 0:
                     face_data["baseline"] = float(current_baseline_ear)
                     face_data["blink_phase"] = blink_info.get("phase", "monitoring")
+                    
+                    # Add debug info for threshold monitoring
+                    if blink_info.get("phase") == "monitoring":
+                        current_ear_drop_absolute = current_baseline_ear - avg_ear
+                        if current_ear_drop_absolute > 0:
+                            face_data["ear_drop_absolute"] = float(current_ear_drop_absolute)
+                            face_data["ear_drop_percentage"] = float((current_baseline_ear - avg_ear) / current_baseline_ear)
                 elif current_baseline_ear == 0:
                     face_data["blink_phase"] = "initializing"
             
