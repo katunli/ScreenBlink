@@ -384,7 +384,7 @@ export default function ScreenBlinkHomepage() {
 									<input
 										type="range"
 										min="1"
-										max="15"
+										max="10"
 										value={preferences.reminderInterval}
 										onChange={(e) => {
 											const newInterval = Number.parseInt(e.target.value);
@@ -401,7 +401,7 @@ export default function ScreenBlinkHomepage() {
 										}}
 										className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
 										style={{
-											background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${((preferences.reminderInterval - 1) / 14) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} ${((preferences.reminderInterval - 1) / 14) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} 100%)`,
+											background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${((preferences.reminderInterval - 1) / 9) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} ${((preferences.reminderInterval - 1) / 9) * 100}%, ${preferences.darkMode ? "#1E3A8A" : "#E5E7EB"} 100%)`,
 										}}
 									/>
 									<div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full font-semibold min-w-[80px] text-center">
