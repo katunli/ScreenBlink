@@ -21,9 +21,34 @@ BLINK_DISPLAY_DURATION = 0.2
 # Adaptive approach: requires both percentage drop AND absolute EAR drop
 # This prevents false blinks when baseline EAR is very low (small fluctuations 
 # can cause high percentage drops but small absolute changes)
-BLINK_MIN_EAR_DROP = 0.17
+BLINK_MIN_EAR_DROP = 0.19
 BLINK_MIN_ABSOLUTE_EAR_DROP = 0.03
-BLINK_DURATION_MIN = 0.05
+
+def get_adaptive_ear_drop_threshold(baseline_ear):
+    """
+    Calculate adaptive EAR drop percentage using a linear function.
+    Threshold smoothly decreases as baseline EAR increases for continuous adaptation.
+    """
+    if baseline_ear <= 0.0:
+        return BLINK_MIN_EAR_DROP  # Fallback to default
+    
+    min_ear = 0.15
+    max_ear = 0.35
+    max_threshold = 0.20  # For very small eyes (less conservative)
+    min_threshold = 0.15  # For large eyes
+    
+    # Clamp baseline_ear to valid range
+    clamped_ear = max(min_ear, min(baseline_ear, max_ear))
+    
+    # Calculate slope for linear decrease
+    slope = (max_threshold - min_threshold) / (max_ear - min_ear)
+    
+    # Linear function: threshold decreases as EAR increases
+    threshold = max_threshold - slope * (clamped_ear - min_ear)
+    
+    return threshold
+
+BLINK_DURATION_MIN = 0.1
 BLINK_DURATION_MAX = 0.6
 BLINK_RECOVERY_THRESHOLD = 0.7
 BASELINE_WINDOW_SIZE = 15
@@ -130,15 +155,18 @@ def detect_blink_advanced(current_ear, current_time):
     ear_drop_percentage = (current_baseline_ear - current_ear) / current_baseline_ear
     ear_drop_absolute = current_baseline_ear - current_ear
     
+    # Get adaptive threshold based on baseline EAR size
+    adaptive_threshold = get_adaptive_ear_drop_threshold(current_baseline_ear)
+    
     # Start blink detection when both percentage and absolute drop thresholds are met
     if (not blink_in_progress and 
-        ear_drop_percentage > BLINK_MIN_EAR_DROP and 
+        ear_drop_percentage > adaptive_threshold and 
         ear_drop_absolute > BLINK_MIN_ABSOLUTE_EAR_DROP and 
         ear_drop_percentage > 0):
         blink_in_progress = True
         blink_start_time = current_time
         max_drop_percentage = ear_drop_percentage
-        return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "start"}
+        return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "start", "threshold": adaptive_threshold}
     
     # Track maximum drop and validate blink completion
     elif blink_in_progress:
@@ -151,7 +179,7 @@ def detect_blink_advanced(current_ear, current_time):
         if current_ear > current_baseline_ear * BLINK_RECOVERY_THRESHOLD or blink_duration > BLINK_DURATION_MAX:
             # Only register as valid blink if both percentage and absolute drop thresholds are met
             if (BLINK_DURATION_MIN <= blink_duration <= BLINK_DURATION_MAX and 
-                max_drop_percentage > BLINK_MIN_EAR_DROP and
+                max_drop_percentage > adaptive_threshold and
                 (current_baseline_ear * max_drop_percentage) > BLINK_MIN_ABSOLUTE_EAR_DROP):
                 if (current_time - last_blink_time) > BLINK_COOLDOWN:
                     last_blink_time = current_time
@@ -165,13 +193,14 @@ def detect_blink_advanced(current_ear, current_time):
                         "drop": max_drop_percentage,
                         "max_drop_ear": max_drop_ear,
                         "duration": blink_duration,
-                        "phase": "complete"
+                        "phase": "complete",
+                        "threshold": adaptive_threshold
                     }
             
             blink_in_progress = False
             max_drop_percentage = 0.0
     
-    return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "monitoring"}
+    return False, {"baseline": current_baseline_ear, "drop": ear_drop_percentage, "phase": "monitoring", "threshold": adaptive_threshold}
 
 def reset_blink_detection():
     global baseline_ear_values, current_baseline_ear, blink_in_progress, blink_start_time, last_blink_time, baseline_smoothing_factor, max_drop_percentage
