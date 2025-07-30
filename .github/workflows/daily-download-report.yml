@@ -59,9 +59,13 @@ jobs:
           
           # Check if assets were replaced (download count dropped significantly)
           # If current count is less than 10% of previous count, treat as replacement
+          ASSET_REPLACED_DMG=false
+          ASSET_REPLACED_EXE=false
+          
           if [ "$YESTERDAY_DMG" -gt 0 ] && [ "$CURR_DMG" -lt $((YESTERDAY_DMG / 10)) ]; then
             echo "Asset replacement detected for DMG - treating as fresh start"
             DIFF_DMG=$CURR_DMG
+            ASSET_REPLACED_DMG=true
           else
             DIFF_DMG=$((CURR_DMG - YESTERDAY_DMG))
           fi
@@ -69,6 +73,7 @@ jobs:
           if [ "$YESTERDAY_EXE" -gt 0 ] && [ "$CURR_EXE" -lt $((YESTERDAY_EXE / 10)) ]; then
             echo "Asset replacement detected for EXE - treating as fresh start"
             DIFF_EXE=$CURR_EXE
+            ASSET_REPLACED_EXE=true
           else
             DIFF_EXE=$((CURR_EXE - YESTERDAY_EXE))
           fi
@@ -112,11 +117,21 @@ jobs:
           echo "DIFF_DMG_MONDAY=$DIFF_DMG_MONDAY" >> $GITHUB_ENV
           echo "DIFF_EXE_MONDAY=$DIFF_EXE_MONDAY" >> $GITHUB_ENV
           echo "DIFF_TOTAL_MONDAY=$DIFF_TOTAL_MONDAY" >> $GITHUB_ENV
+          
           # Update prev_counts.json for next run
+          # If assets were replaced, reset the stored counts to current values
+          # so next comparison starts fresh from the new asset
+          if [ "$ASSET_REPLACED_DMG" = true ]; then
+            YESTERDAY_DMG=$CURR_DMG
+          fi
+          if [ "$ASSET_REPLACED_EXE" = true ]; then
+            YESTERDAY_EXE=$CURR_EXE
+          fi
+          
           if [ "$TODAY" = "1" ]; then # Monday
             jq -n --argjson dmg "$CURR_DMG" --argjson exe "$CURR_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $dmg, exe: $exe}}' > prev_counts.json
           else
-            jq -n --argjson dmg "$CURR_DMG" --argjson exe "$CURR_EXE" --argjson mdmg "$MONDAY_DMG" --argjson mexe "$MONDAY_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $mdmg, exe: $mexe}}' > prev_counts.json
+            jq -n --argjson dmg "$YESTERDAY_DMG" --argjson exe "$YESTERDAY_EXE" --argjson mdmg "$MONDAY_DMG" --argjson mexe "$MONDAY_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $mdmg, exe: $mexe}}' > prev_counts.json
           fi
 
       - name: Save new counts to cache
