@@ -347,10 +347,10 @@ export default function ScreenBlinkHomepage() {
 				)}
 
 				{/* Main Control Panel */}
-				<div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-6">
-					<div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
+				<div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 mb-6 overflow-hidden">
+					<div className="grid lg:grid-cols-2 gap-6 lg:gap-8 min-w-0">
 						{/* Left Column - Main Controls */}
-						<div className="space-y-6">
+						<div className="space-y-6 min-w-0">
 							<div className="flex justify-between items-center">
 								<h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
 									<Settings className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -375,7 +375,7 @@ export default function ScreenBlinkHomepage() {
 							</div>
 
 							{/* Reminder Interval Setting */}
-							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
 								<label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
 									<Clock className="w-4 h-4" />
 									Reminder Interval
@@ -450,7 +450,7 @@ export default function ScreenBlinkHomepage() {
 							</div>
 
 							{/* Camera Toggle */}
-							<div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+							<div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
 								<label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
 									<Camera className="w-4 h-4" />
 									Camera Detection
@@ -537,7 +537,7 @@ export default function ScreenBlinkHomepage() {
 
 
 									{/* MGD Toggle Box */}
-									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
 										<div className="flex items-center justify-between mb-3">
 											<div className="flex items-center gap-2">
 												<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -619,13 +619,13 @@ export default function ScreenBlinkHomepage() {
 						</div>
 
 						{/* Right Column - Feature Toggles */}
-						<div className="space-y-6">
+						<div className="space-y-6 min-w-0">
 							<h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">
 								Preferences
 							</h2>
 
 							{/* Eye Exercises Toggle */}
-							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
 								<div className="flex items-center justify-between mb-3">
 									<div className="flex items-center gap-2">
 										<Dumbbell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -704,7 +704,7 @@ export default function ScreenBlinkHomepage() {
 							</div>
 
 							{/* Keyboard Shortcut Settings */}
-							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
 								<div className="flex items-center justify-between mb-3">
 									<div className="flex items-center gap-2">
 										<Zap className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -767,7 +767,7 @@ export default function ScreenBlinkHomepage() {
 							</div>
 
 							{/* Popup Position and Size Settings */}
-							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
 								<div className="flex items-center justify-between mb-3">
 									<div className="flex items-center gap-2">
 										<Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -862,8 +862,8 @@ export default function ScreenBlinkHomepage() {
 														</div>
 													</div>
 												) : (
-													<div className="flex items-center gap-2">
-														<p className="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">
+													<div className="flex items-center gap-2 min-w-0">
+														<p className="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate min-w-0 overflow-hidden">
 															"{preferences.popupMessage}"
 														</p>
 														<button
@@ -871,7 +871,7 @@ export default function ScreenBlinkHomepage() {
 																setTempMessage(preferences.popupMessage);
 																setIsEditingMessage(true);
 															}}
-															className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+															className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex-shrink-0"
 														>
 															Edit
 														</button>
@@ -995,7 +995,7 @@ export default function ScreenBlinkHomepage() {
 							</div>
 
 							{/* Sound Toggle */}
-							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6">
+							<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
 								<div className="flex items-center justify-between mb-3">
 									<div className="flex items-center gap-2">
 										{preferences.soundEnabled ? (
