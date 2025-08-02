@@ -54,59 +54,53 @@ jobs:
           CURR_DMG=${{ env.CURR_DMG }}
           CURR_EXE=${{ env.CURR_EXE }}
           CURR_TOTAL=${{ env.CURR_TOTAL }}
-          YESTERDAY_TOTAL=$((YESTERDAY_DMG + YESTERDAY_EXE))
-          MONDAY_TOTAL=$((MONDAY_DMG + MONDAY_EXE))
           
-          # Check if assets were replaced (download count dropped significantly)
-          # If current count is less than 10% of previous count, treat as replacement
-          ASSET_REPLACED_DMG=false
-          ASSET_REPLACED_EXE=false
-          
-          if [ "$YESTERDAY_DMG" -gt 0 ] && [ "$CURR_DMG" -lt $((YESTERDAY_DMG / 10)) ]; then
-            echo "Asset replacement detected for DMG - treating as fresh start"
-            DIFF_DMG=$CURR_DMG
-            ASSET_REPLACED_DMG=true
-          else
+          # Calculate differences for DMG
+          if [ "$CURR_DMG" -gt "$YESTERDAY_DMG" ]; then
+            # Downloads went up - show the increase
             DIFF_DMG=$((CURR_DMG - YESTERDAY_DMG))
-          fi
-          
-          if [ "$YESTERDAY_EXE" -gt 0 ] && [ "$CURR_EXE" -lt $((YESTERDAY_EXE / 10)) ]; then
-            echo "Asset replacement detected for EXE - treating as fresh start"
-            DIFF_EXE=$CURR_EXE
-            ASSET_REPLACED_EXE=true
+            DISPLAY_DMG="$CURR_DMG (+$DIFF_DMG)"
           else
+            # Downloads went down - treat as asset replacement
+            # Show current downloads + current downloads (since replacement started at 0)
+            DIFF_DMG=$CURR_DMG
+            DISPLAY_DMG="$CURR_DMG (+$CURR_DMG)"
+            # Reset yesterday count to current for next comparison
+            YESTERDAY_DMG=$CURR_DMG
+          fi
+          
+          # Calculate differences for EXE
+          if [ "$CURR_EXE" -gt "$YESTERDAY_EXE" ]; then
+            # Downloads went up - show the increase
             DIFF_EXE=$((CURR_EXE - YESTERDAY_EXE))
+            DISPLAY_EXE="$CURR_EXE (+$DIFF_EXE)"
+          else
+            # Downloads went down - treat as asset replacement
+            # Show current downloads + current downloads (since replacement started at 0)
+            DIFF_EXE=$CURR_EXE
+            DISPLAY_EXE="$CURR_EXE (+$CURR_EXE)"
+            # Reset yesterday count to current for next comparison
+            YESTERDAY_EXE=$CURR_EXE
           fi
           
-          # Ensure we don't show negative numbers
-          if [ "$DIFF_DMG" -lt 0 ]; then
-            DIFF_DMG=0
-          fi
-          if [ "$DIFF_EXE" -lt 0 ]; then
-            DIFF_EXE=0
-          fi
-          
+          # Calculate total difference
           DIFF_TOTAL=$((DIFF_DMG + DIFF_EXE))
           
-          # Handle Monday comparisons similarly
-          if [ "$MONDAY_DMG" -gt 0 ] && [ "$CURR_DMG" -lt $((MONDAY_DMG / 10)) ]; then
-            DIFF_DMG_MONDAY=$CURR_DMG
-          else
+          # Handle Monday comparisons
+          if [ "$CURR_DMG" -gt "$MONDAY_DMG" ]; then
             DIFF_DMG_MONDAY=$((CURR_DMG - MONDAY_DMG))
-          fi
-          
-          if [ "$MONDAY_EXE" -gt 0 ] && [ "$CURR_EXE" -lt $((MONDAY_EXE / 10)) ]; then
-            DIFF_EXE_MONDAY=$CURR_EXE
           else
-            DIFF_EXE_MONDAY=$((CURR_EXE - MONDAY_EXE))
+            # Asset replacement since Monday
+            DIFF_DMG_MONDAY=$CURR_DMG
+            MONDAY_DMG=$CURR_DMG
           fi
           
-          # Ensure we don't show negative numbers for Monday comparisons
-          if [ "$DIFF_DMG_MONDAY" -lt 0 ]; then
-            DIFF_DMG_MONDAY=0
-          fi
-          if [ "$DIFF_EXE_MONDAY" -lt 0 ]; then
-            DIFF_EXE_MONDAY=0
+          if [ "$CURR_EXE" -gt "$MONDAY_EXE" ]; then
+            DIFF_EXE_MONDAY=$((CURR_EXE - MONDAY_EXE))
+          else
+            # Asset replacement since Monday
+            DIFF_EXE_MONDAY=$CURR_EXE
+            MONDAY_EXE=$CURR_EXE
           fi
           
           DIFF_TOTAL_MONDAY=$((DIFF_DMG_MONDAY + DIFF_EXE_MONDAY))
@@ -117,17 +111,10 @@ jobs:
           echo "DIFF_DMG_MONDAY=$DIFF_DMG_MONDAY" >> $GITHUB_ENV
           echo "DIFF_EXE_MONDAY=$DIFF_EXE_MONDAY" >> $GITHUB_ENV
           echo "DIFF_TOTAL_MONDAY=$DIFF_TOTAL_MONDAY" >> $GITHUB_ENV
+          echo "DISPLAY_DMG=$DISPLAY_DMG" >> $GITHUB_ENV
+          echo "DISPLAY_EXE=$DISPLAY_EXE" >> $GITHUB_ENV
           
           # Update prev_counts.json for next run
-          # If assets were replaced, reset the stored counts to current values
-          # so next comparison starts fresh from the new asset
-          if [ "$ASSET_REPLACED_DMG" = true ]; then
-            YESTERDAY_DMG=$CURR_DMG
-          fi
-          if [ "$ASSET_REPLACED_EXE" = true ]; then
-            YESTERDAY_EXE=$CURR_EXE
-          fi
-          
           if [ "$TODAY" = "1" ]; then # Monday
             jq -n --argjson dmg "$CURR_DMG" --argjson exe "$CURR_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $dmg, exe: $exe}}' > prev_counts.json
           else
@@ -153,8 +140,8 @@ jobs:
           body: |
             📊 Download Statistics - Latest Release
 
-            - macOS (.dmg) ............... ${{ env.CURR_DMG }}  (+${{ env.DIFF_DMG }})
-            - Windows (.exe) ............. ${{ env.CURR_EXE }}  (+${{ env.DIFF_EXE }})
+            - macOS (.dmg) ............... ${{ env.DISPLAY_DMG }}
+            - Windows (.exe) ............. ${{ env.DISPLAY_EXE }}
 
             📈 Total Downloads: ${{ env.CURR_TOTAL }}  (+${{ env.DIFF_TOTAL }})
 
