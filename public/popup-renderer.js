@@ -305,6 +305,12 @@ function initPopup() {
   // Initialize based on popup type
   if (document.getElementById('exercise')) {
     initExercisePopup();
+    // Set transparent background for exercise popup to avoid double dark background
+    updateColors({
+      background: 'transparent',
+      text: '#FFFFFF',
+      transparency: 0.3
+    });
   } else if (document.getElementById('canvas')) {
     // Camera window
     window.popupAPI.onFaceTrackingData((data) => {
