@@ -3,86 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
   <title>Blink Reminder</title>
-  <style>
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.3);
-    }
-    #blink {
-      font-size: 2rem;
-      font-weight: bold;
-      text-shadow: 0 2px 8px #0004;
-      opacity: 0;
-      animation: fadeInOut 2.5s forwards;
-    }
-    #blink.camera-mode {
-      animation: fadeIn 0.5s forwards;
-    }
-    @keyframes fadeInOut {
-      0% { opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    @keyframes fadeIn {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-    @media (prefers-color-scheme: dark) {
-      html, body {
-        background: rgba(0, 0, 0, 0.5);
-      }
-      #blink {
-        text-shadow: 0 2px 8px #0008;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="popup-styles.css">
 </head>
 <body>
   <div id="blink">Blink!</div>
-  <script>
-    const { ipcRenderer } = require('electron');
-    
-    function updateColors(colors) {
-      // Use solid background color without alpha channel - transparency is handled by window opacity
-      document.body.style.background = colors.background;
-      document.getElementById('blink').style.color = colors.text;
-    }
-
-    // Set initial colors
-    updateColors({
-      background: '#1E1E1E',
-      text: '#FFFFFF',
-      transparency: 0.3
-    });
-    
-    // Listen for color updates
-    ipcRenderer.on('update-colors', (event, colors) => {
-      updateColors(colors);
-    });
-
-    // Listen for message updates
-    ipcRenderer.on('update-message', (event, message) => {
-      document.getElementById('blink').textContent = message;
-    });
-
-    // Listen for camera mode updates
-    ipcRenderer.on('camera-mode', (event, isEnabled) => {
-      const blinkElement = document.getElementById('blink');
-      if (isEnabled) {
-        blinkElement.classList.add('camera-mode');
-      } else {
-        blinkElement.classList.remove('camera-mode');
-      }
-    });
-  </script>
+  <script src="popup-renderer.js"></script>
 </body>
 </html> 

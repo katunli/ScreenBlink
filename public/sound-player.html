@@ -1,29 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; media-src 'self' file:;">
     <title>Sound Player</title>
 </head>
 <body>
     <audio id="audio" preload="auto"></audio>
-    <script>
-        const { ipcRenderer } = require('electron');
-        
-        ipcRenderer.on('play-sound', (event, soundPath) => {
-            console.log('Sound player received path:', soundPath);
-            const audio = document.getElementById('audio');
-            audio.src = soundPath;
-            
-            // Listen for when audio finishes playing
-            audio.addEventListener('ended', () => {
-                ipcRenderer.send('audio-finished');
-            });
-            
-            audio.play().catch(error => {
-                console.error('Error playing sound:', error);
-                // If there's an error, still notify that we're done
-                ipcRenderer.send('audio-finished');
-            });
-        });
-    </script>
+    <script src="popup-renderer.js"></script>
 </body>
 </html> 

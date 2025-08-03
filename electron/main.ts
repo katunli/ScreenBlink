@@ -765,8 +765,9 @@ function showStartingPopup() {
 		acceptFirstMouse: false,
 		type: 'panel', 
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
@@ -826,8 +827,9 @@ function showBlinkPopup() {
 		acceptFirstMouse: false,
 		type: 'panel', 
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
@@ -891,8 +893,9 @@ function showStoppedPopup() {
 		acceptFirstMouse: false,
 		type: 'panel', 
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
@@ -1079,21 +1082,13 @@ function showCameraWindow() {
 		height: windowHeight,
 		title: 'Camera Visualization',
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
 	cameraWindow.loadFile(path.join(process.env.VITE_PUBLIC, 'camera.html'));
-	
-	cameraWindow.webContents.on('did-finish-load', () => {
-		// Request video stream from blink detector process
-		if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
-			blinkDetectorProcess.stdin.write(JSON.stringify({ 
-				request_video: true 
-			}) + '\n');
-		}
-	});
 	
 	cameraWindow.on('closed', () => {
 		cameraWindow = null;
@@ -1596,8 +1591,9 @@ function showExercisePopup() {
 		hasShadow: false,
 		type: 'panel',
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
@@ -1614,10 +1610,6 @@ function showExercisePopup() {
 
 	currentExercisePopup = popup;
 	popup.loadFile(path.join(process.env.VITE_PUBLIC, "exercise.html"));
-	
-	popup.webContents.on('did-finish-load', () => {
-		popup.webContents.send('update-colors', { darkMode: preferences.darkMode });
-	});
 	
 	popup.once("ready-to-show", () => {
 		popup.show();
@@ -1920,6 +1912,15 @@ ipcMain.on('close-camera-window', () => {
 	}
 });
 
+ipcMain.on('request-video-stream', () => {
+	// Request video stream from blink detector process
+	if (blinkDetectorProcess && blinkDetectorProcess.stdin) {
+		blinkDetectorProcess.stdin.write(JSON.stringify({ 
+			request_video: true 
+		}) + '\n');
+	}
+});
+
 function showPopupEditor() {
 	if (popupEditorWindow) {
 		popupEditorWindow.focus();
@@ -1952,8 +1953,9 @@ function showPopupEditor() {
 		movable: true,
 		type: 'panel',
 		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
 		},
 	});
 
@@ -2077,8 +2079,9 @@ function playNotificationSound(soundType: 'blink' | 'exercise' | 'stopped' = 'bl
 			height: 1,
 			show: false,
 			webPreferences: {
-				nodeIntegration: true,
-				contextIsolation: false,
+				nodeIntegration: false,
+				contextIsolation: true,
+				preload: path.join(__dirname, "preload.mjs"),
 			},
 		});
 		
