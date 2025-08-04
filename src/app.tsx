@@ -196,15 +196,21 @@ export default function ScreenBlinkHomepage() {
 		);
 		window.ipcRenderer?.send("update-popup-message", preferences.popupMessage);
 		window.ipcRenderer?.send(
-			"update-interval",
-			preferences.reminderInterval * 1000,
-		);
-		window.ipcRenderer?.send(
 			"update-keyboard-shortcut",
 			preferences.keyboardShortcut,
 		);
 		window.ipcRenderer?.send("update-sound-enabled", preferences.soundEnabled);
 	}, [preferences]);
+
+	// Handle reminder interval updates separately (only when not tracking)
+	useEffect(() => {
+		if (!preferences.isTracking) {
+			window.ipcRenderer?.send(
+				"update-interval",
+				preferences.reminderInterval * 1000,
+			);
+		}
+	}, [preferences.reminderInterval, preferences.isTracking]);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -388,15 +394,20 @@ export default function ScreenBlinkHomepage() {
 										value={preferences.reminderInterval}
 										onChange={(e) => {
 											const newInterval = Number.parseInt(e.target.value);
-											setPreferences((prev) => ({
-												...prev,
-												reminderInterval: newInterval,
-											}));
+											
+											// If reminders are active, stop them first
 											if (preferences.isTracking) {
-												window.ipcRenderer?.send(
-													"update-interval",
-													newInterval * 1000,
-												);
+												window.ipcRenderer?.send("stop-blink-reminders");
+												setPreferences((prev) => ({
+													...prev,
+													isTracking: false,
+													reminderInterval: newInterval,
+												}));
+											} else {
+												setPreferences((prev) => ({
+													...prev,
+													reminderInterval: newInterval,
+												}));
 											}
 										}}
 										className="w-full sm:flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
