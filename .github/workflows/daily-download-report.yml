@@ -9,148 +9,45 @@ jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - name: Restore previous download counts
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: prev_counts.json
-          key: download-counts
-          restore-keys: |
-            download-counts
-
-      - name: Get latest release asset download counts
+      - name: Get all release asset download counts
         id: get_downloads
         run: |
           REPO="${{ github.repository }}"
-          RELEASE=$(curl -s -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/$REPO/releases/latest)
-          DMG=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".dmg")) | "\(.name): \(.download_count)"')
-          EXE=$(echo "$RELEASE" | jq -r '.assets[]? | select(.name | endswith(".exe")) | "\(.name): \(.download_count)"')
-          CURR_DMG=$(echo "$DMG" | grep -o '[0-9]\+$' 2>/dev/null || echo 0)
-          CURR_EXE=$(echo "$EXE" | grep -o '[0-9]\+$' 2>/dev/null || echo 0)
-          CURR_TOTAL=$((CURR_DMG + CURR_EXE))
-          echo "DMG=$DMG" >> $GITHUB_ENV
-          echo "EXE=$EXE" >> $GITHUB_ENV
-          echo "CURR_DMG=$CURR_DMG" >> $GITHUB_ENV
-          echo "CURR_EXE=$CURR_EXE" >> $GITHUB_ENV
-          echo "CURR_TOTAL=$CURR_TOTAL" >> $GITHUB_ENV
+          
+          # Get all releases and calculate totals using jq
+          RELEASES=$(curl -s -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/releases)
+          
+          # Calculate total DMG downloads across all releases
+          TOTAL_DMG=$(echo "$RELEASES" | jq -r '[.[].assets[]? | select(.name | endswith(".dmg")) | .download_count // 0] | add // 0')
+          
+          # Calculate total EXE downloads across all releases
+          TOTAL_EXE=$(echo "$RELEASES" | jq -r '[.[].assets[]? | select(.name | endswith(".exe")) | .download_count // 0] | add // 0')
+          
+          # Calculate total
+          TOTAL_ALL=$((TOTAL_DMG + TOTAL_EXE))
+          
+          echo "TOTAL_DMG=$TOTAL_DMG" >> $GITHUB_ENV
+          echo "TOTAL_EXE=$TOTAL_EXE" >> $GITHUB_ENV
+          echo "TOTAL_ALL=$TOTAL_ALL" >> $GITHUB_ENV
 
-      - name: Calculate differences and update history
-        id: diff
-        run: |
-          set -e
-          TODAY=$(date +%u) # 1=Monday, 7=Sunday
-          # Defaults
-          YESTERDAY_DMG=0
-          YESTERDAY_EXE=0
-          MONDAY_DMG=0
-          MONDAY_EXE=0
-          if [ -f prev_counts.json ] && jq empty prev_counts.json 2>/dev/null; then
-            YESTERDAY_DMG=$(jq -r '.yesterday.dmg' prev_counts.json 2>/dev/null)
-            YESTERDAY_EXE=$(jq -r '.yesterday.exe' prev_counts.json 2>/dev/null)
-            MONDAY_DMG=$(jq -r '.monday.dmg' prev_counts.json 2>/dev/null)
-            MONDAY_EXE=$(jq -r '.monday.exe' prev_counts.json 2>/dev/null)
-          fi
-          CURR_DMG=${{ env.CURR_DMG }}
-          CURR_EXE=${{ env.CURR_EXE }}
-          CURR_TOTAL=${{ env.CURR_TOTAL }}
-          
-          # Calculate differences for DMG
-          if [ "$CURR_DMG" -gt "$YESTERDAY_DMG" ]; then
-            # Downloads went up - show the increase
-            DIFF_DMG=$((CURR_DMG - YESTERDAY_DMG))
-            DISPLAY_DMG="$CURR_DMG (+$DIFF_DMG)"
-          else
-            # Downloads went down - treat as asset replacement
-            # Show current downloads + current downloads (since replacement started at 0)
-            DIFF_DMG=$CURR_DMG
-            DISPLAY_DMG="$CURR_DMG (+$CURR_DMG)"
-            # Reset yesterday count to current for next comparison
-            YESTERDAY_DMG=$CURR_DMG
-          fi
-          
-          # Calculate differences for EXE
-          if [ "$CURR_EXE" -gt "$YESTERDAY_EXE" ]; then
-            # Downloads went up - show the increase
-            DIFF_EXE=$((CURR_EXE - YESTERDAY_EXE))
-            DISPLAY_EXE="$CURR_EXE (+$DIFF_EXE)"
-          else
-            # Downloads went down - treat as asset replacement
-            # Show current downloads + current downloads (since replacement started at 0)
-            DIFF_EXE=$CURR_EXE
-            DISPLAY_EXE="$CURR_EXE (+$CURR_EXE)"
-            # Reset yesterday count to current for next comparison
-            YESTERDAY_EXE=$CURR_EXE
-          fi
-          
-          # Calculate total difference
-          DIFF_TOTAL=$((DIFF_DMG + DIFF_EXE))
-          
-          # Handle Monday comparisons
-          if [ "$CURR_DMG" -gt "$MONDAY_DMG" ]; then
-            DIFF_DMG_MONDAY=$((CURR_DMG - MONDAY_DMG))
-          else
-            # Asset replacement since Monday
-            DIFF_DMG_MONDAY=$CURR_DMG
-            MONDAY_DMG=$CURR_DMG
-          fi
-          
-          if [ "$CURR_EXE" -gt "$MONDAY_EXE" ]; then
-            DIFF_EXE_MONDAY=$((CURR_EXE - MONDAY_EXE))
-          else
-            # Asset replacement since Monday
-            DIFF_EXE_MONDAY=$CURR_EXE
-            MONDAY_EXE=$CURR_EXE
-          fi
-          
-          DIFF_TOTAL_MONDAY=$((DIFF_DMG_MONDAY + DIFF_EXE_MONDAY))
-          
-          echo "DIFF_DMG=$DIFF_DMG" >> $GITHUB_ENV
-          echo "DIFF_EXE=$DIFF_EXE" >> $GITHUB_ENV
-          echo "DIFF_TOTAL=$DIFF_TOTAL" >> $GITHUB_ENV
-          echo "DIFF_DMG_MONDAY=$DIFF_DMG_MONDAY" >> $GITHUB_ENV
-          echo "DIFF_EXE_MONDAY=$DIFF_EXE_MONDAY" >> $GITHUB_ENV
-          echo "DIFF_TOTAL_MONDAY=$DIFF_TOTAL_MONDAY" >> $GITHUB_ENV
-          echo "DISPLAY_DMG=$DISPLAY_DMG" >> $GITHUB_ENV
-          echo "DISPLAY_EXE=$DISPLAY_EXE" >> $GITHUB_ENV
-          
-          # Update prev_counts.json for next run
-          if [ "$TODAY" = "1" ]; then # Monday
-            jq -n --argjson dmg "$CURR_DMG" --argjson exe "$CURR_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $dmg, exe: $exe}}' > prev_counts.json
-          else
-            jq -n --argjson dmg "$YESTERDAY_DMG" --argjson exe "$YESTERDAY_EXE" --argjson mdmg "$MONDAY_DMG" --argjson mexe "$MONDAY_EXE" '{yesterday: {dmg: $dmg, exe: $exe}, monday: {dmg: $mdmg, exe: $mexe}}' > prev_counts.json
-          fi
-
-      - name: Save new counts to cache
-        uses: actions/cache@v4
-        with:
-          path: prev_counts.json
-          key: download-counts
-
-      - name: Send email with download counts
+      - name: Send email with total download counts
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "📊 Download Statistics - Latest Release"
+          subject: "📊 Total Download Statistics - All Releases"
           to: katunjieli@gmail.com
           from: ${{ secrets.EMAIL_USERNAME }}
           body: |
-            📊 Download Statistics - Latest Release
+            📊 Total Download Statistics - All Releases
 
-            - macOS (.dmg) ............... ${{ env.DISPLAY_DMG }}
-            - Windows (.exe) ............. ${{ env.DISPLAY_EXE }}
+            - macOS (.dmg) ............... ${{ env.TOTAL_DMG }}
+            - Windows (.exe) ............. ${{ env.TOTAL_EXE }}
 
-            📈 Total Downloads: ${{ env.CURR_TOTAL }}  (+${{ env.DIFF_TOTAL }})
+            📈 Total Downloads: ${{ env.TOTAL_ALL }}
 
             ---
-            📊 Change since yesterday:
-              • macOS: +${{ env.DIFF_DMG }}
-              • Windows: +${{ env.DIFF_EXE }}
-
-            📅 Change since Monday:
-              • macOS: +${{ env.DIFF_DMG_MONDAY }}
-              • Windows: +${{ env.DIFF_EXE_MONDAY }}
-              • Total: +${{ env.DIFF_TOTAL_MONDAY }}
+            This represents the cumulative download count across all releases.
