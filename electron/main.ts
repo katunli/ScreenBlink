@@ -1035,6 +1035,10 @@ function registerGlobalShortcut(shortcut: string) {
 				console.log('Stopping reminders via keyboard shortcut...');
 				ensureNoReminderActivity();
 				showStoppedPopup();
+				if (cameraWindow && !cameraWindow.isDestroyed()) {
+					cameraWindow.close();
+					cameraWindow = null;
+				}
 			} else {
 				console.log('Starting reminders via keyboard shortcut...');
 				
