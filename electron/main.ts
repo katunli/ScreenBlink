@@ -1444,6 +1444,12 @@ ipcMain.on("stop-blink-reminders", () => {
 		isAutoResuming = false;
 	}
 	
+	// Close any active camera visualization window
+	if (cameraWindow && !cameraWindow.isDestroyed()) {
+		cameraWindow.close();
+		cameraWindow = null;
+	}
+	
 	ensureNoReminderActivity();
 	showStoppedPopup();
 });
