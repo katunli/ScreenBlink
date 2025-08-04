@@ -62,6 +62,7 @@
 		"appId": "com.screenblink.app",
 		"productName": "ScreenBlink",
 		"publish": null,
+		"artifactName": "${productName}-${arch}.${ext}",
 		"files": [
 			"dist/**/*",
 			"dist-electron/**/*",
@@ -87,7 +88,8 @@
 			"deleteAppDataOnUninstall": false,
 			"displayLanguageSelector": false,
 			"installerLanguages": ["en-US"],
-			"language": "1033"
+			"language": "1033",
+			"artifactName": "ScreenBlink.Setup.${ext}"
 		},
 		"mac": {
 			"target": [
@@ -100,7 +102,8 @@
 			"gatekeeperAssess": false,
 			"entitlements": "build/entitlements.mac.plist",
 			"entitlementsInherit": "build/entitlements.mac.plist",
-			"notarize": true
+			"notarize": true,
+			"artifactName": "ScreenBlink-${arch}.${ext}"
 		},
 		"win": {
 			"target": [
