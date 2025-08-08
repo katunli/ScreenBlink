@@ -1638,7 +1638,7 @@ function showExercisePopup() {
 			currentExercisePopup = null;
 			isExerciseShowing = false;
 		}
-	}, 15000);
+	}, 30000);
 }
 
 function startExerciseMonitoring() {
