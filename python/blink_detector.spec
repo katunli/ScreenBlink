@@ -1,10 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files
+
+datas = collect_data_files('cv2', includes=['data/*.xml'])
+
 a = Analysis(
     ['blink_detector.py'],
     pathex=[],
     binaries=[],
-    datas=[('../electron/assets/models', 'assets/models')],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -62,7 +62,7 @@ def build_binary():
         if spec_file.exists():
             print("Using existing spec file...")
             try:
-                cmd = ["pyinstaller", "--clean", "blink_detector.spec"]
+                cmd = [sys.executable, "-m", "PyInstaller", "--clean", "blink_detector.spec"]
                 print(f"Command: {' '.join(cmd)}")
                 result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 print("PyInstaller output:")
@@ -113,7 +113,9 @@ def build_with_direct_command(blink_detector_path, model_source):
         print(f"Warning: Model directory not found at {model_source}")
         print("Will try to build without models (binary may not work properly)")
         cmd = [
-            "pyinstaller",
+            sys.executable,
+            "-m",
+            "PyInstaller",
             "--clean",
             "--onefile",
             "--name=blink_detector",
@@ -123,7 +125,9 @@ def build_with_direct_command(blink_detector_path, model_source):
         # Use relative paths since we're now in the script directory
         relative_model_path = model_source.relative_to(Path.cwd())
         cmd = [
-            "pyinstaller",
+            sys.executable,
+            "-m",
+            "PyInstaller",
             "--clean",
             "--onefile",
             "--name=blink_detector",
@@ -174,4 +178,4 @@ def main():
     print("3. Test the binary on a clean machine without Python installed")
 
 if __name__ == "__main__":
-    main() 
+    main()
