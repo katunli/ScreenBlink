@@ -467,8 +467,7 @@ export default function ScreenBlinkHomepage() {
 									Camera Detection
 								</label>
 								<div className="flex items-center gap-2">
-									{preferences.isTracking &&
-										preferences.cameraEnabled &&
+									{preferences.cameraEnabled &&
 										(isCameraWindowOpen ? (
 											<button
 												onClick={() => {
@@ -482,6 +481,16 @@ export default function ScreenBlinkHomepage() {
 										) : (
 											<button
 												onClick={() => {
+													if (!preferences.isTracking) {
+														setPreferences((prev) => ({
+															...prev,
+															isTracking: true,
+														}));
+														window.ipcRenderer?.send(
+															"start-blink-reminders",
+															preferences.reminderInterval * 1000,
+														);
+													}
 													window.ipcRenderer?.send("show-camera-window");
 													setIsCameraWindowOpen(true);
 												}}
